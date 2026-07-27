@@ -25,7 +25,7 @@ export function startNyOkt(konkurranse) {
   okt = {
     konkurranse,
     deltakerIder: [],
-    startBaner: null,   // settes av courtSetup når "Start økt" trykkes
+    startBaner: null,   // settes rett etter "Start økt" trykkes i registrer-deltakere
     plasseringer: [],   // rekkefølge admin trykker spillere i ved sluttregistrering
   };
 }

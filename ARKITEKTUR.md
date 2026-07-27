@@ -56,7 +56,6 @@ bytter ratingalgoritme senere uten å røre noe annet.
       home.js
       competitions.js
       registerPlayers.js
-      courtSetup.js
       activeSession.js
       registerFinish.js
       ratingLists.js
@@ -118,7 +117,7 @@ sessions/{oktId}
 1. **Domenelaget** (denne omgangen) — ferdig testbar rating-motor, ingen UI.
 2. Firestore-repository som implementerer kontrakten.
 3. Skjermene, i denne rekkefølgen: hjemskjerm -> konkurransevalg ->
-   registrer deltakere -> baneoppsett -> aktiv økt -> registrer sluttbane
+   registrer deltakere -> aktiv økt -> registrer sluttbane
    -> ratinglister -> arkiv.
 4. Koble sammen i `app.js`, samme mønster som `app.js` i Stafettligaen.
 

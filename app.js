@@ -23,10 +23,9 @@ import { settRatingService, settAktivKlubbId } from './state.js';
 import { visKonkurranser } from './screens-competitions.js';
 import { visRatinglister } from './screens-ratingLists.js';
 import { visArkiv } from './screens-archive.js';
-// registerPlayers.js, courtSetup.js, activeSession.js og registerFinish.js
+// registerPlayers.js, activeSession.js og registerFinish.js
 // kobler seg selv til window.* og importeres transitivt via competitions.js
 import './screens-registerPlayers.js';
-import './screens-courtSetup.js';
 import './screens-activeSession.js';
 import './screens-registerFinish.js';
 

@@ -8,7 +8,7 @@ import {
   hentRatingService, hentSpillerKart, leggTilLokalt, navnFor,
 } from './state.js';
 import { KONKURRANSE_NAVN } from './domain-constants.js';
-import { visBaneoppsett } from './screens-courtSetup.js';
+import { visAktivOkt } from './screens-activeSession.js';
 
 let spillerKart = new Map(); // id -> navn, satt etter hentSpillerKart()
 
@@ -42,11 +42,10 @@ function tegnListe() {
       ${spillerKart.size ? radHtml : '<div class="tom-tilstand-liten">Ingen spillere funnet</div>'}
     </div>
     <div class="seksjon-etikett">Ikke på ratinglisten</div>
-    <div style="display:flex;gap:8px;margin-bottom:24px">
+    <div style="display:flex;gap:8px;margin-bottom:8px">
       <input type="text" id="manuell-navn-input" placeholder="Skriv navn" style="flex:1">
       <button class="knapp knapp-omriss knapp-liten" style="width:auto" onclick="window.leggTilManuellSpiller()">Legg til</button>
     </div>
-    <button class="knapp knapp-primaer" onclick="window.startOktFraDeltakere()">Start økt</button>
   `;
 
   document.getElementById('deltaker-teller').textContent = `${okt.deltakerIder.length} valgt`;
@@ -80,7 +79,7 @@ export async function startOktFraDeltakere() {
   const ratingService = hentRatingService();
   const baner = await ratingService.genererBaner(okt.konkurranse, okt.deltakerIder);
   settStartBaner(baner);
-  visBaneoppsett();
+  visAktivOkt();
 }
 window.startOktFraDeltakere = startOktFraDeltakere;
 
