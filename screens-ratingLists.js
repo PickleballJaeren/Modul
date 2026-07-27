@@ -8,12 +8,15 @@ import { db, SAM, collection, query, where, orderBy, limit, getDocs, doc, getDoc
 import { lagBatchHjelper } from './batch-helpers.js';
 import { escHtml, naviger, visMelding } from './ui.js';
 import { hentSpillerKart } from './state.js';
-import { ALLE_KATEGORIER, RATINGKATEGORI_NAVN, STARTRATING } from './domain-constants.js';
+import { ALLE_KATEGORIER, RATINGKATEGORI_NAVN, STARTRATING, KONKURRANSE_NAVN } from './domain-constants.js';
 
 const KATEGORI_IKON = { soft_play: '🎯', power_play: '⚡', defense: '🛡️', singles: '🙋', allround: '🏆' };
 const KATEGORI_FARGE = {
   soft_play: 'var(--green2)', power_play: 'var(--orange)', defense: 'var(--accent2)',
   singles: 'var(--yellow)', allround: 'var(--white)',
+};
+const KATEGORI_FARGE_HEX = {
+  soft_play: '#22c55e', power_play: '#ea580c', defense: '#3b82f6', singles: '#eab308',
 };
 
 const FANER = [{ id: 'allround', navn: 'Allround' }, ...ALLE_KATEGORIER.map(k => ({ id: k, navn: RATINGKATEGORI_NAVN[k] }))];
@@ -82,11 +85,136 @@ async function tegnListe() {
   listeContainer.innerHTML = rader.map((r, i) => `
     <div class="rating-rad">
       <span class="rating-plass">${i + 1}</span>
-      <span class="rating-navn">${escHtml(spillerKart.get(r.spillerId) ?? r.spillerId)}</span>
+      <span class="rating-navn" style="cursor:pointer" onclick="window.apneSpillerprofil('${r.spillerId}')">${escHtml(spillerKart.get(r.spillerId) ?? r.spillerId)}</span>
       <span class="rating-verdi">${r.verdi}</span>
     </div>
   `).join('');
 }
+
+// ════════════════════════════════════════════════════════
+// SPILLERPROFIL — trykk et navn i ratinglisten for å se rating
+// over tid per kategori (håndtegnet SVG, ingen ekstern chart-lib
+// siden appen er en offline-PWA og sw.js kun cacher egne filer),
+// pluss de siste 10 øktene med sluttbane og elo-endring.
+//
+// Merk: Allround lagres kun som gjeldende verdi (playerAllround),
+// ikke som historikk over tid -- den vises derfor kun i toppen av
+// profilen, ikke som egen linje i grafen.
+// ════════════════════════════════════════════════════════
+function byggRatingSvg(historikkPerKategori) {
+  const alleTider = [];
+  const alleVerdier = [];
+  Object.values(historikkPerKategori).forEach(liste => liste.forEach(h => {
+    alleTider.push(new Date(h.dato).getTime());
+    alleVerdier.push(h.eloEtter);
+  }));
+
+  if (alleTider.length === 0) {
+    return '<div class="tom-tilstand-liten">Ingen historikk ennå</div>';
+  }
+
+  const minT = Math.min(...alleTider);
+  const maxT = Math.max(...alleTider);
+  const minV = Math.min(...alleVerdier, STARTRATING) - 20;
+  const maxV = Math.max(...alleVerdier, STARTRATING) + 20;
+
+  const bredde = 440, hoyde = 160, padL = 34, padB = 20, padT = 10, padR = 10;
+  const skalaX = t => padL + (maxT === minT ? (bredde - padL - padR) / 2 : ((t - minT) / (maxT - minT)) * (bredde - padL - padR));
+  const skalaY = v => padT + (1 - (v - minV) / ((maxV - minV) || 1)) * (hoyde - padT - padB);
+
+  let linjer = '';
+  Object.entries(historikkPerKategori).forEach(([kategori, liste]) => {
+    if (!liste.length) return;
+    const sortert = [...liste].sort((a, b) => new Date(a.dato) - new Date(b.dato));
+    const punkter = sortert.map(h => `${skalaX(new Date(h.dato).getTime()).toFixed(1)},${skalaY(h.eloEtter).toFixed(1)}`).join(' ');
+    linjer += `<polyline points="${punkter}" fill="none" stroke="${KATEGORI_FARGE_HEX[kategori]}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />`;
+    sortert.forEach(h => {
+      linjer += `<circle cx="${skalaX(new Date(h.dato).getTime()).toFixed(1)}" cy="${skalaY(h.eloEtter).toFixed(1)}" r="2.5" fill="${KATEGORI_FARGE_HEX[kategori]}" />`;
+    });
+  });
+
+  return `
+    <svg viewBox="0 0 ${bredde} ${hoyde}" style="width:100%;height:${hoyde}px;display:block">
+      <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${hoyde - padB}" stroke="rgba(255,255,255,0.13)" />
+      <line x1="${padL}" y1="${hoyde - padB}" x2="${bredde - padR}" y2="${hoyde - padB}" stroke="rgba(255,255,255,0.13)" />
+      <text x="4" y="${skalaY(maxV).toFixed(1)}" font-size="10" fill="#64748b">${Math.round(maxV)}</text>
+      <text x="4" y="${(hoyde - padB).toFixed(1)}" font-size="10" fill="#64748b">${Math.round(minV)}</text>
+      ${linjer}
+    </svg>
+  `;
+}
+
+async function hentHistorikkForSpiller(spillerId) {
+  const historikkPerKategori = {};
+  await Promise.all(ALLE_KATEGORIER.map(async kategori => {
+    const snap = await getDoc(doc(db, SAM.PLAYER_CATEGORY_RATINGS, `${spillerId}_${kategori}`));
+    historikkPerKategori[kategori] = snap.exists() ? (snap.data().historikk ?? []) : [];
+  }));
+
+  // Øktene lagres uten spillerId på toppnivå (kun inni resultatPerSpiller),
+  // så vi henter hele samlingen og filtrerer i klienten -- samme mønster
+  // som brukes i Administrasjon-slettingen lenger ned i denne filen.
+  const oktSnap = await getDocs(query(collection(db, SAM.SESSIONS), orderBy('dato', 'desc'), limit(200)));
+  const okter = [];
+  for (const d of oktSnap.docs) {
+    const okt = d.data();
+    const rad = (okt.resultatPerSpiller ?? []).find(r => r.spillerId === spillerId);
+    if (rad) okter.push({ okt, rad });
+    if (okter.length >= 10) break;
+  }
+
+  return { historikkPerKategori, okter };
+}
+
+window.apneSpillerprofil = async function (spillerId) {
+  const spillerKart = await hentSpillerKart();
+  const navn = spillerKart.get(spillerId) ?? spillerId;
+  document.getElementById('spillerprofil-navn').textContent = navn;
+  document.getElementById('spillerprofil-avatar').textContent = navn.split(' ').map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase();
+  document.getElementById('spillerprofil-allround').textContent = '…';
+  document.getElementById('spillerprofil-legende').innerHTML = ALLE_KATEGORIER.map(k => `
+    <span style="display:flex;align-items:center;gap:5px">
+      <span style="width:9px;height:9px;border-radius:2px;background:${KATEGORI_FARGE_HEX[k]}"></span>${escHtml(RATINGKATEGORI_NAVN[k])}
+    </span>
+  `).join('');
+  document.getElementById('spillerprofil-graf').innerHTML = '<div class="laster"><span class="laster-snurr"></span>Henter historikk…</div>';
+  document.getElementById('spillerprofil-historikk').innerHTML = '';
+  document.getElementById('modal-spillerprofil').style.display = 'flex';
+
+  try {
+    const allroundSnap = await getDoc(doc(db, SAM.PLAYER_ALLROUND, spillerId));
+    document.getElementById('spillerprofil-allround').textContent = allroundSnap.exists() ? allroundSnap.data().allround : STARTRATING;
+
+    const { historikkPerKategori, okter } = await hentHistorikkForSpiller(spillerId);
+    document.getElementById('spillerprofil-graf').innerHTML = byggRatingSvg(historikkPerKategori);
+
+    document.getElementById('spillerprofil-historikk').innerHTML = okter.length
+      ? okter.map(({ okt, rad }, i) => {
+          const dato = okt.dato?.toDate ? okt.dato.toDate() : new Date();
+          const datoTekst = dato.toLocaleDateString('no-NO', { day: 'numeric', month: 'long' });
+          const antallBaner = Math.ceil((okt.resultatPerSpiller?.length ?? 2) / 2);
+          const delta = rad.delta ?? 0;
+          const deltaKlasse = delta > 0 ? 'beveg-opp' : delta < 0 ? 'beveg-ned' : 'beveg-lik';
+          return `
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;${i < okter.length - 1 ? 'border-bottom:1px solid var(--border)' : ''}">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:15px;font-weight:500">${escHtml(KONKURRANSE_NAVN[okt.konkurranse] ?? okt.konkurranse)}</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:2px">${datoTekst} · Bane ${rad.sluttBane ?? '–'} av ${antallBaner}</div>
+              </div>
+              <span class="beveg-badge ${deltaKlasse}">${delta > 0 ? '+' : ''}${delta}</span>
+            </div>
+          `;
+        }).join('')
+      : '<div class="tom-tilstand-liten">Ingen økter registrert ennå</div>';
+  } catch (e) {
+    console.error('[spillerprofil] Kunne ikke hente data:', e);
+    document.getElementById('spillerprofil-graf').innerHTML = '<div class="tom-tilstand-liten">Kunne ikke hente historikk</div>';
+  }
+};
+
+window.lukkSpillerprofil = function () {
+  document.getElementById('modal-spillerprofil').style.display = 'none';
+};
 
 // ════════════════════════════════════════════════════════
 // SAMMENLIGN SPILLERE — velg to spillere og sammenlign rating i
@@ -193,6 +321,8 @@ document.addEventListener('sl-naviger', e => {
   if (e.detail?.skjerm !== 'ratinglister') {
     const boks = document.getElementById('sammenlign-boks');
     if (boks) boks.style.display = 'none';
+    const profilModal = document.getElementById('modal-spillerprofil');
+    if (profilModal) profilModal.style.display = 'none';
   }
 });
 
