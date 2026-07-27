@@ -153,6 +153,22 @@
     <div id="ratinglister-innhold"></div>
 
     <div style="text-align:center;margin-top:22px">
+      <button type="button" onclick="window.visSammenlignSeksjon?.()"
+              style="display:inline-flex;align-items:center;gap:8px;background:var(--navy2);border:1px solid var(--border2);
+                     border-radius:999px;padding:11px 24px;color:inherit;font:inherit;font-size:15px;font-weight:600;cursor:pointer">
+        <span style="font-size:15px">⚖️</span> Sammenlign spillere
+      </button>
+    </div>
+    <div class="sl-regel-boks" id="sammenlign-boks" style="display:none;margin-top:12px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+        <select id="sammenlign-a" onchange="window.tegnSammenligning?.()" style="flex:1"></select>
+        <span style="font-family:'Bebas Neue',cursive;font-size:16px;color:var(--muted);flex-shrink:0">VS</span>
+        <select id="sammenlign-b" onchange="window.tegnSammenligning?.()" style="flex:1"></select>
+      </div>
+      <div id="sammenlign-rader"></div>
+    </div>
+
+    <div style="text-align:center;margin-top:22px">
       <button type="button" onclick="window.visAdminSeksjon?.()"
               style="display:inline-flex;align-items:center;gap:8px;background:var(--navy2);border:1px solid var(--border2);
                      border-radius:999px;padding:11px 24px;color:inherit;font:inherit;font-size:15px;font-weight:600;cursor:pointer">
