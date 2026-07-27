@@ -3,7 +3,8 @@
 // Samme mønster som app.js i Stafettligaen.
 // ════════════════════════════════════════════════════════
 
-import { db } from './firebase.js';
+import { db, SAM, collection, getDocs } from './firebase.js';
+import { lagBatchHjelper } from './batch-helpers.js';
 import { naviger, visMelding, visFBFeil, registrerBeforeunload } from './ui.js';
 import {
   registrerPinGetter, registrerKlubbIdGetter,
@@ -18,7 +19,7 @@ import * as provisionalPolicy from './domain-rating-provisionalPolicy.js';
 import * as baneStrategi from './domain-rating-courtAssignment.js';
 import * as allroundKalkulator from './domain-rating-allroundCalculator.js';
 import { lagFirestoreRatingRepository } from './domain-repository-firestoreRatingRepository.js';
-import { settRatingService, settAktivKlubbId } from './state.js';
+import { settRatingService, settAktivKlubbId, hentSpillerKart } from './state.js';
 
 import { visKonkurranser } from './screens-competitions.js';
 import { visRatinglister } from './screens-ratingLists.js';
@@ -130,6 +131,100 @@ window.visDelAppenSeksjon = function () {
 };
 
 // ════════════════════════════════════════════════════════
+// ADMINISTRASJON — slett all rating / arkiv for aktiv klubb
+//
+// Ratinger og økter lagres ikke med klubbId direkte i Firestore (se
+// ARKITEKTUR.md-datamodellen); avgrensningen til "aktiv klubb" skjer
+// derfor ved å slå opp hvilke spillerIder som tilhører klubben (samme
+// players-oppslag som resten av appen bruker), og kun slette/behandle
+// dokumenter som gjelder disse spillerIdene.
+// ════════════════════════════════════════════════════════
+async function hentKlubbSpillerIder() {
+  const kart = await hentSpillerKart(); // Map<spillerId, navn>, filtrert på aktiv klubb
+  return new Set(kart.keys());
+}
+
+function apneSlettBekreft(tittel, tekst, handling) {
+  document.getElementById('slett-bekreft-tittel').textContent = tittel;
+  document.getElementById('slett-bekreft-tekst').textContent = tekst;
+  const knapp = document.getElementById('slett-bekreft-knapp');
+  knapp.onclick = async () => {
+    knapp.disabled = true;
+    knapp.textContent = 'Sletter…';
+    try {
+      await handling();
+      lukkSlettBekreft();
+      visMelding('Slettet');
+    } catch (e) {
+      console.error('[admin] Sletting feilet:', e);
+      visMelding('Noe gikk galt under slettingen', 'feil');
+    } finally {
+      knapp.disabled = false;
+      knapp.textContent = 'Ja, slett';
+    }
+  };
+  document.getElementById('modal-slett-bekreft').style.display = 'flex';
+}
+window.lukkSlettBekreft = function () {
+  document.getElementById('modal-slett-bekreft').style.display = 'none';
+};
+
+async function slettAllRatingForKlubb() {
+  const klubbSpillerIder = await hentKlubbSpillerIder();
+  const bh = lagBatchHjelper(db);
+
+  for (const samling of [SAM.PLAYER_CATEGORY_RATINGS, SAM.PLAYER_COMPETITION_PROGRESS, SAM.PLAYER_ALLROUND]) {
+    const snap = await getDocs(collection(db, samling));
+    for (const d of snap.docs) {
+      if (klubbSpillerIder.has(d.data().spillerId)) await bh.slett(d.ref);
+    }
+  }
+  await bh.kommit();
+}
+
+async function slettArkivForKlubb() {
+  const klubbSpillerIder = await hentKlubbSpillerIder();
+  const bh = lagBatchHjelper(db);
+
+  const snap = await getDocs(collection(db, SAM.SESSIONS));
+  for (const d of snap.docs) {
+    const okt = d.data();
+    const tilhorerKlubb = (okt.resultatPerSpiller ?? []).some(r => klubbSpillerIder.has(r.spillerId));
+    if (tilhorerKlubb) await bh.slett(d.ref);
+  }
+  await bh.kommit();
+}
+
+window.visAdminSeksjon = function () {
+  if (!aktivKlubbId) {
+    visMelding('Velg klubb først', 'advarsel');
+    return;
+  }
+  krevAdminMedDemo('Administrasjon', 'Kun admin har tilgang til disse handlingene.', () => {
+    const boks = document.getElementById('admin-seksjon-boks');
+    if (boks) boks.style.display = 'block';
+    const navn = document.getElementById('admin-seksjon-klubbnavn');
+    if (navn) navn.textContent = getAktivKlubb()?.navn ?? 'klubben';
+  });
+};
+
+window.slettRatingBekreft = function () {
+  apneSlettBekreft(
+    'Slett all rating?',
+    `Sletter permanent alle elo-ratinger, allround-verdier og fremgangsstatus for spillerne i ${getAktivKlubb()?.navn ?? 'klubben'}. Dette kan ikke angres.`,
+    slettAllRatingForKlubb,
+  );
+};
+
+window.slettArkivBekreft = function () {
+  apneSlettBekreft(
+    'Slett arkiv?',
+    `Sletter permanent alle arkiverte økter for ${getAktivKlubb()?.navn ?? 'klubben'}. Dette kan ikke angres.`,
+    slettArkivForKlubb,
+  );
+};
+
+// ════════════════════════════════════════════════════════
 // HJEMSKJERM-HANDLINGER
 // ════════════════════════════════════════════════════════
 window.startNyOkt = function () {
@@ -160,8 +255,10 @@ settRatingService(lagRatingService({
 // ════════════════════════════════════════════════════════
 document.addEventListener('sl-naviger', e => {
   if (e.detail?.skjerm !== 'hjem') {
-    const boks = document.getElementById('del-appen-boks');
-    if (boks) boks.style.display = 'none';
+    const delBoks = document.getElementById('del-appen-boks');
+    if (delBoks) delBoks.style.display = 'none';
+    const adminBoks = document.getElementById('admin-seksjon-boks');
+    if (adminBoks) adminBoks.style.display = 'none';
   }
 });
 
