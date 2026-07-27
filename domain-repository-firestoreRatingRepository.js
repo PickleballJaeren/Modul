@@ -40,9 +40,15 @@ export function lagFirestoreRatingRepository() {
   }
 
   async function lagreAllround(spillerId, allroundVerdi) {
-    await setDoc(doc(db, SAM.PLAYER_ALLROUND, spillerId), {
+    const ref = doc(db, SAM.PLAYER_ALLROUND, spillerId);
+    const eksisterende = await getDoc(ref);
+    const historikk = eksisterende.exists() ? (eksisterende.data().historikk ?? []) : [];
+    historikk.push({ dato: new Date().toISOString(), allround: allroundVerdi });
+
+    await setDoc(ref, {
       spillerId,
       allround: allroundVerdi,
+      historikk,
       oppdatert: serverTimestamp(),
     }, { merge: true });
   }

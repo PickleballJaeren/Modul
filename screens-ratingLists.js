@@ -16,7 +16,7 @@ const KATEGORI_FARGE = {
   singles: 'var(--yellow)', allround: 'var(--white)',
 };
 const KATEGORI_FARGE_HEX = {
-  soft_play: '#22c55e', power_play: '#ea580c', defense: '#3b82f6', singles: '#eab308',
+  allround: '#e5e7eb', soft_play: '#22c55e', power_play: '#ea580c', defense: '#3b82f6', singles: '#eab308',
 };
 
 const FANER = [{ id: 'allround', navn: 'Allround' }, ...ALLE_KATEGORIER.map(k => ({ id: k, navn: RATINGKATEGORI_NAVN[k] }))];
@@ -136,7 +136,7 @@ function byggRatingSvg(historikkPerKategori) {
   const minV = Math.min(...alleVerdier, STARTRATING) - 20;
   const maxV = Math.max(...alleVerdier, STARTRATING) + 20;
 
-  const bredde = 440, hoyde = 160, padL = 58, padB = 20, padT = 10, padR = 10;
+  const bredde = 440, hoyde = 320, padL = 58, padB = 20, padT = 10, padR = 10;
   const skalaX = t => padL + (maxT === minT ? (bredde - padL - padR) / 2 : ((t - minT) / (maxT - minT)) * (bredde - padL - padR));
   const skalaY = v => padT + (1 - (v - minV) / ((maxV - minV) || 1)) * (hoyde - padT - padB);
 
@@ -173,6 +173,14 @@ async function hentHistorikkForSpiller(spillerId) {
     historikkPerKategori[kategori] = snap.exists() ? (snap.data().historikk ?? []) : [];
   }));
 
+  // Allround-historikken lagres separat (playerAllround), med feltnavnet
+  // "allround" i stedet for "eloEtter" -- oversett formen slik at
+  // byggRatingSvg() kan behandle den likt som kategorilinjene.
+  const allroundSnap = await getDoc(doc(db, SAM.PLAYER_ALLROUND, spillerId));
+  historikkPerKategori.allround = allroundSnap.exists()
+    ? (allroundSnap.data().historikk ?? []).map(h => ({ dato: h.dato, eloEtter: h.allround }))
+    : [];
+
   // Øktene lagres uten spillerId på toppnivå (kun inni resultatPerSpiller),
   // så vi henter hele samlingen og filtrerer i klienten -- samme mønster
   // som brukes i Administrasjon-slettingen lenger ned i denne filen.
@@ -194,9 +202,9 @@ window.apneSpillerprofil = async function (spillerId) {
   document.getElementById('spillerprofil-navn').textContent = navn;
   document.getElementById('spillerprofil-avatar').textContent = navn.split(' ').map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase();
   document.getElementById('spillerprofil-allround').textContent = '…';
-  document.getElementById('spillerprofil-legende').innerHTML = ALLE_KATEGORIER.map(k => `
-    <span style="display:flex;align-items:center;gap:5px">
-      <span style="width:9px;height:9px;border-radius:2px;background:${KATEGORI_FARGE_HEX[k]}"></span>${escHtml(RATINGKATEGORI_NAVN[k])}
+  document.getElementById('spillerprofil-legende').innerHTML = FANER.map(f => `
+    <span style="display:flex;align-items:center;gap:6px">
+      <span style="width:9px;height:9px;border-radius:2px;background:${KATEGORI_FARGE_HEX[f.id]}"></span>${escHtml(f.navn)}
     </span>
   `).join('');
   document.getElementById('spillerprofil-graf').innerHTML = '<div class="laster"><span class="laster-snurr"></span>Henter historikk…</div>';
