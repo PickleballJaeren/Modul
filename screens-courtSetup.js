@@ -5,7 +5,7 @@
 // ════════════════════════════════════════════════════════
 
 import { escHtml, naviger } from './ui.js';
-import { hentOkt } from './state-oktState.js';
+import { hentOkt } from './state.js';
 import { KONKURRANSE_NAVN } from './domain-constants.js';
 import { hentSpillerNavn } from './screens-registerPlayers.js';
 import { visAktivOkt } from './screens-activeSession.js';

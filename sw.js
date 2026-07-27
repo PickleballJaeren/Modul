@@ -16,9 +16,9 @@ const SHELL = [
   './admin.js',
   './batch-helpers.js',
   './qrcode.js',
-  './state-oktState.js',
-  './state-services.js',
-  './state-spillerCache.js',
+  
+  
+  './state.js',
   './domain-constants.js',
   './domain-rating-pairwiseAverageElo.js',
   './domain-rating-provisionalPolicy.js',

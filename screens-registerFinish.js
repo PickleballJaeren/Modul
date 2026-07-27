@@ -9,10 +9,9 @@
 import { escHtml, naviger, visMelding } from './ui.js';
 import {
   hentOkt, plasserSpiller, angreSisteePlassering, erFerdigPlassert,
-  beregnSluttbaner, nullstillOkt,
-} from './state-oktState.js';
+  beregnSluttbaner, nullstillOkt, hentRatingService,
+} from './state.js';
 import { finnStartBane } from './domain-rating-courtAssignment.js';
-import { hentRatingService } from './state-services.js';
 import { KONKURRANSE_NAVN } from './domain-constants.js';
 import { hentSpillerNavn } from './screens-registerPlayers.js';
 

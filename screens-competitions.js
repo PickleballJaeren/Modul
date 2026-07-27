@@ -6,7 +6,7 @@ import {
   ALLE_KONKURRANSER, KONKURRANSE_NAVN, KONKURRANSE_TIL_KATEGORI, RATINGKATEGORI_NAVN,
 } from './domain-constants.js';
 import { escHtml, naviger } from './ui.js';
-import { startNyOkt } from './state-oktState.js';
+import { startNyOkt } from './state.js';
 import { visRegistrerDeltakere } from './screens-registerPlayers.js';
 
 export const IKON = {

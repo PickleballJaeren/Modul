@@ -3,9 +3,10 @@
 // ════════════════════════════════════════════════════════
 
 import { escHtml, naviger, visMelding } from './ui.js';
-import { erDeltaker, veksleDeltaker, hentOkt, settStartBaner } from './state-oktState.js';
-import { hentRatingService } from './state-services.js';
-import { hentSpillerKart, leggTilLokalt, navnFor } from './state-spillerCache.js';
+import {
+  erDeltaker, veksleDeltaker, hentOkt, settStartBaner,
+  hentRatingService, hentSpillerKart, leggTilLokalt, navnFor,
+} from './state.js';
 import { KONKURRANSE_NAVN } from './domain-constants.js';
 import { visBaneoppsett } from './screens-courtSetup.js';
 

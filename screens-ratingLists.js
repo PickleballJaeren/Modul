@@ -6,7 +6,7 @@
 
 import { db, SAM, collection, query, where, orderBy, limit, getDocs } from './firebase.js';
 import { escHtml, naviger } from './ui.js';
-import { hentSpillerKart } from './state-spillerCache.js';
+import { hentSpillerKart } from './state.js';
 import { ALLE_KATEGORIER, RATINGKATEGORI_NAVN } from './domain-constants.js';
 
 const FANER = [{ id: 'allround', navn: 'Allround' }, ...ALLE_KATEGORIER.map(k => ({ id: k, navn: RATINGKATEGORI_NAVN[k] }))];

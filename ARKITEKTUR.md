@@ -136,7 +136,5 @@ Jeg starter med punkt 1 nå, siden det er fundamentet alt annet bygger på.
 | domain/rating/ratingService.js | `domain-rating-ratingService.js` |
 | domain/rating/_selvtest.mjs | `domain-rating-selvtest.mjs` |
 | domain/repository/firestoreRatingRepository.js | `domain-repository-firestoreRatingRepository.js` |
-| state/oktState.js | `state-oktState.js` |
-| state/services.js | `state-services.js` |
-| state/spillerCache.js | `state-spillerCache.js` |
+| state/*.js (oktState, services, spillerCache) | `state.js` (slått sammen -- se begrunnelse i filen) |
 | screens/*.js | `screens-*.js` |

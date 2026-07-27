@@ -18,7 +18,7 @@ import * as provisionalPolicy from './domain-rating-provisionalPolicy.js';
 import * as baneStrategi from './domain-rating-courtAssignment.js';
 import * as allroundKalkulator from './domain-rating-allroundCalculator.js';
 import { lagFirestoreRatingRepository } from './domain-repository-firestoreRatingRepository.js';
-import { settRatingService } from './state-services.js';
+import { settRatingService } from './state.js';
 
 import { visKonkurranser } from './screens-competitions.js';
 import { visRatinglister } from './screens-ratingLists.js';
