@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#050f1f">
+<title>1 vs 1</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ── TOAST / FEILBANNERE ── -->
+<div id="toast" class="toast"></div>
+<div id="firebase-feil-banner" class="firebase-feil-banner">
+  <span id="firebase-feil-tekst"></span>
+</div>
+
+<!-- ── HJEM ── -->
+<div id="skjerm-hjem" class="screen active">
+  <div class="scroll-omrade">
+    <div class="hjem-wrap">
+      <img src="logo.svg" alt="1 vs 1" class="hjem-logo">
+      <div class="hjem-tittel">1 VS 1</div>
+      <div class="hjem-undertittel">Småspill</div>
+    </div>
+
+    <div class="seksjon-etikett">Velg klubb</div>
+    <select id="klubb-velger" onchange="byttKlubb(this.value)">
+      <option value="">— Velg klubb —</option>
+      <option value="pickleball-jaeren">Pickleball Jæren</option>
+      <option value="fokus-pickleball">Fokus Pickleball</option>
+      <option value="tsi-pickleball">TSI Pickleball</option>
+      <option value="loten-pickleball">Løten Tennisklubb</option>
+      <option value="demo">Demo</option>
+    </select>
+    <div id="demo-info" class="sl-regel-boks" style="display:none;margin-top:14px">
+      Demo-modus — alle er automatisk admin, ingen PIN kreves.
+    </div>
+
+    <div id="hjem-klubb-handlinger" style="display:none;margin-top:16px;flex-direction:column;gap:10px">
+      <button class="knapp knapp-primaer" style="width:100%" onclick="window.startNyOkt?.()">
+        Start ny økt
+      </button>
+      <div style="display:flex;gap:10px">
+        <button class="knapp knapp-omriss" style="flex:1" onclick="window.visRatinglister?.()">Ratinglister</button>
+        <button class="knapp knapp-omriss" style="flex:1" onclick="window.visArkiv?.()">Arkiv</button>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:26px">
+      <button type="button" onclick="window.visDelAppenSeksjon?.()"
+              style="display:inline-flex;align-items:center;gap:8px;background:var(--navy2);border:1px solid var(--border2);
+                     border-radius:999px;padding:11px 24px;color:inherit;font:inherit;font-size:15px;font-weight:600;cursor:pointer">
+        <span style="font-size:17px">🔗</span> Del appen
+      </button>
+      <div style="font-size:12px;color:var(--muted2);margin-top:6px">Krever admin</div>
+    </div>
+    <div class="sl-regel-boks" id="del-appen-boks" style="display:none;text-align:center;padding:20px 16px;margin-top:12px">
+      <div id="hjem-qr" style="display:inline-block;background:#fff;padding:10px;border-radius:14px;line-height:0"></div>
+      <div style="font-size:13px;color:var(--muted2);margin-top:12px">Skann for å åpne appen på mobil</div>
+      <button class="knapp knapp-omriss knapp-liten" style="margin-top:10px" onclick="window.kopierAppLenke?.()">Kopier lenke</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── VELG KONKURRANSE ── -->
+<div id="skjerm-konkurranser" class="screen">
+  <div class="app-header">
+    <button class="tilbake-btn" onclick="naviger('hjem')">←</button>
+    <div style="flex:1">
+      <div class="app-name">1 vs 1</div>
+      <div class="app-sub">Velg konkurranse</div>
+    </div>
+  </div>
+  <div class="scroll-omrade">
+    <div id="konkurranser-innhold"></div>
+  </div>
+</div>
+
+<!-- ── REGISTRER DELTAKERE ── -->
+<div id="skjerm-registrer-deltakere" class="screen">
+  <div class="app-header">
+    <button class="tilbake-btn" onclick="naviger('konkurranser')">←</button>
+    <div style="flex:1">
+      <div class="app-name" id="registrer-deltakere-tittel">Registrer spillere</div>
+      <div class="app-sub">Velg deltakere</div>
+    </div>
+    <div class="header-teller" id="deltaker-teller">0 valgt</div>
+  </div>
+  <div class="scroll-omrade">
+    <div id="registrer-deltakere-innhold"></div>
+  </div>
+</div>
+
+<!-- ── BANEOPPSETT ── -->
+<div id="skjerm-baneoppsett" class="screen">
+  <div class="app-header">
+    <button class="tilbake-btn" onclick="naviger('registrer-deltakere')">←</button>
+    <div style="flex:1">
+      <div class="app-name" id="baneoppsett-tittel">Baneoppsett</div>
+      <div class="app-sub">Automatisk fordelt etter rating</div>
+    </div>
+  </div>
+  <div class="scroll-omrade">
+    <div id="baneoppsett-innhold"></div>
+  </div>
+</div>
+
+<!-- ── AKTIV ØKT ── -->
+<div id="skjerm-aktiv-okt" class="screen">
+  <div class="app-header">
+    <button class="tilbake-btn" onclick="naviger('hjem')">←</button>
+    <div style="flex:1">
+      <div class="app-name" id="aktiv-okt-tittel">Pågår</div>
+      <div class="app-sub">Baneliste</div>
+    </div>
+    <span class="kat-tag kat-soft_play" style="background:rgba(34,197,94,.15);color:var(--green2)">Aktiv</span>
+  </div>
+  <div class="scroll-omrade">
+    <div id="aktiv-okt-innhold"></div>
+  </div>
+</div>
+
+<!-- ── REGISTRER SLUTTBANE ── -->
+<div id="skjerm-registrer-sluttbane" class="screen">
+  <div class="app-header">
+    <button class="tilbake-btn" onclick="naviger('aktiv-okt')">←</button>
+    <div style="flex:1">
+      <div class="app-name" id="sluttbane-tittel">Registrer sluttbane</div>
+      <div class="app-sub">Trykk spillere i rekkefølge</div>
+    </div>
+    <div class="header-teller" id="sluttbane-teller">0 av 0</div>
+  </div>
+  <div class="scroll-omrade">
+    <div id="sluttbane-innhold"></div>
+  </div>
+</div>
+
+<!-- ── RATINGLISTER ── -->
+<div id="skjerm-ratinglister" class="screen">
+  <div class="app-header">
+    <button class="tilbake-btn" onclick="naviger('hjem')">←</button>
+    <div style="flex:1">
+      <div class="app-name">Ratinglister</div>
+      <div class="app-sub" id="ratinglister-sub">Allround</div>
+    </div>
+  </div>
+  <div class="scroll-omrade">
+    <div id="ratinglister-innhold"></div>
+  </div>
+</div>
+
+<!-- ── ARKIV ── -->
+<div id="skjerm-arkiv" class="screen">
+  <div class="app-header">
+    <button class="tilbake-btn" onclick="naviger('hjem')">←</button>
+    <div style="flex:1">
+      <div class="app-name">Arkiv</div>
+      <div class="app-sub">Tidligere økter</div>
+    </div>
+  </div>
+  <div class="scroll-omrade">
+    <div id="arkiv-innhold"></div>
+  </div>
+</div>
+
+<!-- ── PIN-MODAL (admin) — gjenbrukt uendret fra Stafettligaen ── -->
+<div class="modal-bakgrunn" id="modal-pin" style="display:none" onclick="if(event.target===this)lukkPinModal()">
+  <div class="modal">
+    <div class="modal-tittel" id="pin-tittel">Admin</div>
+    <div class="modal-tekst" id="pin-tekst"></div>
+    <div class="pin-rad">
+      <input class="pin-siffer" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" id="pin0" oninput="pinInput(0)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input class="pin-siffer" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" id="pin1" oninput="pinInput(1)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input class="pin-siffer" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" id="pin2" oninput="pinInput(2)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input class="pin-siffer" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" id="pin3" oninput="pinInput(3)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+    </div>
+    <div class="pin-feil" id="pin-feil"></div>
+    <button class="knapp knapp-omriss" style="width:100%" onclick="lukkPinModal()">Avbryt</button>
+  </div>
+</div>
+
+<script src="qrcode.js"></script>
+<script type="module" src="app.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js'));
+}
+</script>
+</body>
+</html>
