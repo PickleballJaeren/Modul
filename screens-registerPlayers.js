@@ -38,13 +38,8 @@ function tegnListe() {
   `).join('');
 
   container.innerHTML = `
-    <div class="sl-spillervelger-treff" style="max-height:none;margin-bottom:16px">
+    <div class="sl-spillervelger-treff" style="max-height:none">
       ${spillerKart.size ? radHtml : '<div class="tom-tilstand-liten">Ingen spillere funnet</div>'}
-    </div>
-    <div class="seksjon-etikett">Ikke på ratinglisten</div>
-    <div style="display:flex;gap:8px;margin-bottom:8px">
-      <input type="text" id="manuell-navn-input" placeholder="Skriv navn" style="flex:1">
-      <button class="knapp knapp-omriss knapp-liten" style="width:auto" onclick="window.leggTilManuellSpiller()">Legg til</button>
     </div>
   `;
 
