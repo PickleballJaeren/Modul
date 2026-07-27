@@ -24,7 +24,7 @@ export function visRegistrerSluttbane() {
   tegn();
 }
 
-function bevegelseBadge(startBaneNr, sluttBaneNr) {
+export function bevegelseBadge(startBaneNr, sluttBaneNr) {
   const diff = startBaneNr - sluttBaneNr; // positivt = flyttet opp (lavere banenr)
   if (startBaneNr == null || diff === 0) {
     return `<span class="beveg-badge beveg-lik">uendret</span>`;

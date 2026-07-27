@@ -184,6 +184,16 @@
   </div>
 </div>
 
+<!-- ── ØKTDETALJER-MODAL (arkiv) ── -->
+<div class="modal-bakgrunn" id="modal-okt-detaljer" style="display:none" onclick="if(event.target===this)lukkOktDetaljer()">
+  <div class="modal">
+    <div class="modal-tittel" id="okt-detaljer-tittel">Økt</div>
+    <div class="modal-tekst" id="okt-detaljer-dato"></div>
+    <div id="okt-detaljer-innhold"></div>
+    <button class="knapp knapp-omriss" style="width:100%;margin-top:16px" onclick="lukkOktDetaljer()">Lukk</button>
+  </div>
+</div>
+
 <script src="qrcode.js"></script>
 <script type="module" src="app.js"></script>
 <script>
