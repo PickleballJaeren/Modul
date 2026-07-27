@@ -18,7 +18,7 @@ import * as provisionalPolicy from './domain-rating-provisionalPolicy.js';
 import * as baneStrategi from './domain-rating-courtAssignment.js';
 import * as allroundKalkulator from './domain-rating-allroundCalculator.js';
 import { lagFirestoreRatingRepository } from './domain-repository-firestoreRatingRepository.js';
-import { settRatingService } from './state.js';
+import { settRatingService, settAktivKlubbId } from './state.js';
 
 import { visKonkurranser } from './screens-competitions.js';
 import { visRatinglister } from './screens-ratingLists.js';
@@ -58,11 +58,13 @@ window.krevAdmin = krevAdminMedDemo;
 window.byttKlubb = function (klubbId) {
   if (!klubbId || !KLUBBER[klubbId]) {
     aktivKlubbId = null;
+    settAktivKlubbId(null);
     oppdaterKlubbUI();
     return;
   }
   const forrigeKlubbId = aktivKlubbId;
   aktivKlubbId = klubbId;
+  settAktivKlubbId(klubbId);
   registrerKlubbIdGetter(() => aktivKlubbId);
   registrerPinGetter(getAdminPin);
 

@@ -9,7 +9,7 @@
 // endre hver for seg (algoritme, baneoppsett, allround-metode).
 // ════════════════════════════════════════════════════════
 
-import { db, SAM, collection, getDocs } from './firebase.js';
+import { db, SAM, collection, query, where, getDocs } from './firebase.js';
 
 // ── Økt-tilstand ────────────────────────────────────────
 // Ingenting her skrives til Firestore. Admin gjør ingenting i appen
@@ -80,16 +80,30 @@ export function settRatingService(instans) { ratingService = instans; }
 export function hentRatingService() { return ratingService; }
 
 // ── Delt spillercache (id -> navn) ─────────────────────
-// Hentes én gang fra Firestore og gjenbrukes av alle skjermer som
-// trenger å slå opp navn fra en spillerId.
+// Hentes filtrert på aktiv klubb (samme mønster som lyttere.js i
+// Stafettligaen: where('klubbId', '==', aktivKlubbId)). Cachen
+// nullstilles automatisk når klubb byttes, slik at man aldri kan få
+// tilgang til en annen klubbs spillere ved et uhell.
 
-let spillerKart = null; // Map<spillerId, navn>
+let aktivKlubbId = null;
+let spillerKart = null; // Map<spillerId, navn>, gyldig for aktivKlubbId
+
+export function settAktivKlubbId(id) {
+  if (id !== aktivKlubbId) {
+    aktivKlubbId = id;
+    spillerKart = null; // ny klubb -- forkast forrige klubbs cache
+  }
+}
+
+export function hentAktivKlubbId() { return aktivKlubbId; }
 
 export async function hentSpillerKart() {
   if (spillerKart) return spillerKart;
   spillerKart = new Map();
+  if (!aktivKlubbId) return spillerKart; // ingen klubb valgt -- ingen spillere
   try {
-    const snap = await getDocs(collection(db, SAM.SPILLERE));
+    const q = query(collection(db, SAM.SPILLERE), where('klubbId', '==', aktivKlubbId));
+    const snap = await getDocs(q);
     snap.docs.forEach(d => spillerKart.set(d.id, d.data().navn ?? d.id));
   } catch (e) {
     console.error('[state] Kunne ikke hente spillere:', e);
