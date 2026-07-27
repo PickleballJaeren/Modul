@@ -136,7 +136,7 @@ function byggRatingSvg(historikkPerKategori) {
   const minV = Math.min(...alleVerdier, STARTRATING) - 20;
   const maxV = Math.max(...alleVerdier, STARTRATING) + 20;
 
-  const bredde = 440, hoyde = 320, padL = 58, padB = 20, padT = 10, padR = 10;
+  const bredde = 440, hoyde = 240, padL = 58, padB = 20, padT = 10, padR = 10;
   const skalaX = t => padL + (maxT === minT ? (bredde - padL - padR) / 2 : ((t - minT) / (maxT - minT)) * (bredde - padL - padR));
   const skalaY = v => padT + (1 - (v - minV) / ((maxV - minV) || 1)) * (hoyde - padT - padB);
 
@@ -153,7 +153,7 @@ function byggRatingSvg(historikkPerKategori) {
 
   const gridVerdier = beregnGridVerdier(minV, maxV);
   const rutenettHtml = gridVerdier.map(v => `
-    <text x="4" y="${(skalaY(v) + 4).toFixed(1)}" font-size="20" fill="#64748b">${v.toLocaleString('no-NO')}</text>
+    <text x="4" y="${(skalaY(v) + 4).toFixed(1)}" font-size="15" fill="#64748b">${v.toLocaleString('no-NO')}</text>
   `).join('');
 
   return `
