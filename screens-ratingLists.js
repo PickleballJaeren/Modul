@@ -118,7 +118,7 @@ function byggRatingSvg(historikkPerKategori) {
   const minV = Math.min(...alleVerdier, STARTRATING) - 20;
   const maxV = Math.max(...alleVerdier, STARTRATING) + 20;
 
-  const bredde = 440, hoyde = 160, padL = 34, padB = 20, padT = 10, padR = 10;
+  const bredde = 440, hoyde = 160, padL = 50, padB = 20, padT = 10, padR = 10;
   const skalaX = t => padL + (maxT === minT ? (bredde - padL - padR) / 2 : ((t - minT) / (maxT - minT)) * (bredde - padL - padR));
   const skalaY = v => padT + (1 - (v - minV) / ((maxV - minV) || 1)) * (hoyde - padT - padB);
 
@@ -137,8 +137,8 @@ function byggRatingSvg(historikkPerKategori) {
     <svg viewBox="0 0 ${bredde} ${hoyde}" style="width:100%;height:${hoyde}px;display:block">
       <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${hoyde - padB}" stroke="rgba(255,255,255,0.13)" />
       <line x1="${padL}" y1="${hoyde - padB}" x2="${bredde - padR}" y2="${hoyde - padB}" stroke="rgba(255,255,255,0.13)" />
-      <text x="4" y="${skalaY(maxV).toFixed(1)}" font-size="10" fill="#64748b">${Math.round(maxV)}</text>
-      <text x="4" y="${(hoyde - padB).toFixed(1)}" font-size="10" fill="#64748b">${Math.round(minV)}</text>
+      <text x="4" y="${skalaY(maxV).toFixed(1)}" font-size="20" fill="#64748b">${Math.round(maxV)}</text>
+      <text x="4" y="${(hoyde - padB).toFixed(1)}" font-size="20" fill="#64748b">${Math.round(minV)}</text>
       ${linjer}
     </svg>
   `;

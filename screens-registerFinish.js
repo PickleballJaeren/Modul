@@ -14,6 +14,7 @@ import {
 import { finnStartBane } from './domain-rating-courtAssignment.js';
 import { KONKURRANSE_NAVN } from './domain-constants.js';
 import { hentSpillerNavn } from './screens-registerPlayers.js';
+import { visOktResultat } from './screens-oktResultat.js';
 
 export function visRegistrerSluttbane() {
   const okt = hentOkt();
@@ -104,7 +105,7 @@ export async function fullforOktRegistrering() {
     await ratingService.fullforOkt(resultat);
     visMelding('Økt fullført og lagret i arkivet');
     nullstillOkt();
-    naviger('hjem');
+    visOktResultat(resultat);
   } catch (e) {
     console.error('[registerFinish] Kunne ikke fullføre økt:', e);
     visMelding('Noe gikk galt ved lagring. Prøv igjen.', 'feil');
