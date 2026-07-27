@@ -21,6 +21,24 @@ const KATEGORI_FARGE_HEX = {
 
 const FANER = [{ id: 'allround', navn: 'Allround' }, ...ALLE_KATEGORIER.map(k => ({ id: k, navn: RATINGKATEGORI_NAVN[k] }))];
 
+/**
+ * Regner ut "pene" rutenett-verdier for y-aksen (f.eks. 1000, 1020, 1040...
+ * i stedet for vilkårlige tall), på samme måte som i referansebildet.
+ * Sikter mot ca. 6-7 linjer uansett hvor stort verdiområdet er.
+ */
+function beregnGridVerdier(minV, maxV) {
+  const range = maxV - minV || 1;
+  const raaSteg = range / 6;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(raaSteg)));
+  const normalisert = raaSteg / magnitude;
+  const steg = (normalisert < 1.5 ? 1 : normalisert < 3 ? 2 : normalisert < 7 ? 5 : 10) * magnitude;
+
+  const verdier = [];
+  const start = Math.ceil(minV / steg) * steg;
+  for (let v = start; v <= maxV; v += steg) verdier.push(Math.round(v));
+  return verdier;
+}
+
 let aktivFane = 'allround';
 
 export async function visRatinglister() {
@@ -118,7 +136,7 @@ function byggRatingSvg(historikkPerKategori) {
   const minV = Math.min(...alleVerdier, STARTRATING) - 20;
   const maxV = Math.max(...alleVerdier, STARTRATING) + 20;
 
-  const bredde = 440, hoyde = 160, padL = 50, padB = 20, padT = 10, padR = 10;
+  const bredde = 440, hoyde = 160, padL = 58, padB = 20, padT = 10, padR = 10;
   const skalaX = t => padL + (maxT === minT ? (bredde - padL - padR) / 2 : ((t - minT) / (maxT - minT)) * (bredde - padL - padR));
   const skalaY = v => padT + (1 - (v - minV) / ((maxV - minV) || 1)) * (hoyde - padT - padB);
 
@@ -133,12 +151,16 @@ function byggRatingSvg(historikkPerKategori) {
     });
   });
 
+  const gridVerdier = beregnGridVerdier(minV, maxV);
+  const rutenettHtml = gridVerdier.map(v => `
+    <text x="4" y="${(skalaY(v) + 4).toFixed(1)}" font-size="20" fill="#64748b">${v.toLocaleString('no-NO')}</text>
+  `).join('');
+
   return `
     <svg viewBox="0 0 ${bredde} ${hoyde}" style="width:100%;height:${hoyde}px;display:block">
       <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${hoyde - padB}" stroke="rgba(255,255,255,0.13)" />
       <line x1="${padL}" y1="${hoyde - padB}" x2="${bredde - padR}" y2="${hoyde - padB}" stroke="rgba(255,255,255,0.13)" />
-      <text x="4" y="${skalaY(maxV).toFixed(1)}" font-size="20" fill="#64748b">${Math.round(maxV)}</text>
-      <text x="4" y="${(hoyde - padB).toFixed(1)}" font-size="20" fill="#64748b">${Math.round(minV)}</text>
+      ${rutenettHtml}
       ${linjer}
     </svg>
   `;
