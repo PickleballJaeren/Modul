@@ -154,6 +154,18 @@ settRatingService(lagRatingService({
 }));
 
 // ════════════════════════════════════════════════════════
+// LUKK "DEL APPEN"-BOKSEN VED NAVIGERING BORT FRA HJEM
+// Slik at QR-koden ikke fortsatt står åpen neste gang man kommer
+// tilbake til hjemskjermen.
+// ════════════════════════════════════════════════════════
+document.addEventListener('sl-naviger', e => {
+  if (e.detail?.skjerm !== 'hjem') {
+    const boks = document.getElementById('del-appen-boks');
+    if (boks) boks.style.display = 'none';
+  }
+});
+
+// ════════════════════════════════════════════════════════
 // OPPSTART
 // ════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
