@@ -52,14 +52,18 @@ export function lagRatingService({
     const kFaktorer = new Map();
     const fremgangPerSpiller = new Map();
 
-    for (const id of spillerIder) {
-      const rating = await repository.hentRatingForKategori(id, kategori);
+    // Hent rating + fremgang for ALLE spillere parallelt -- uavhengige
+    // nettverkskall. Ved 28 spillere er dette forskjellen på ~56
+    // sekvensielle rundturer og noen få parallelle bølger.
+    await Promise.all(spillerIder.map(async id => {
+      const [rating, fremgang] = await Promise.all([
+        repository.hentRatingForKategori(id, kategori),
+        repository.hentFremgangForKonkurranse(id, konkurranse),
+      ]);
       naavaerendeElo.set(id, rating?.elo ?? STARTRATING);
-
-      const fremgang = await repository.hentFremgangForKonkurranse(id, konkurranse);
       fremgangPerSpiller.set(id, fremgang ?? { treningsAntall: 0, status: 'provisional' });
       kFaktorer.set(id, provisionalPolicy.hentKFaktor(fremgang));
-    }
+    }));
 
     const endringer = algoritme({ sluttbaner, naavaerendeElo, kFaktorer });
 
@@ -99,10 +103,16 @@ export function lagRatingService({
   async function oppdaterAllround(spillerId) {
     const ratingerPerKategori = {};
 
-    for (const kategori of ALLE_KATEGORIER) {
-      const rating = await repository.hentRatingForKategori(spillerId, kategori);
+    // De 4 kategoriene er uavhengige lesinger -- hent parallelt i stedet
+    // for én og én.
+    const ratinger = await Promise.all(
+      ALLE_KATEGORIER.map(kategori =>
+        repository.hentRatingForKategori(spillerId, kategori).then(rating => ({ kategori, rating })),
+      ),
+    );
+    ratinger.forEach(({ kategori, rating }) => {
       if (rating) ratingerPerKategori[kategori] = rating.elo;
-    }
+    });
 
     const allround = allroundKalkulator.beregnAllround(ratingerPerKategori);
     await repository.lagreAllround(spillerId, allround);

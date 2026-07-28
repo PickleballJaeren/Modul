@@ -103,6 +103,12 @@ export async function fullforOktRegistrering() {
   const ratingService = hentRatingService();
   const sluttbaner = beregnSluttbaner();
 
+  // Vis laster-tilstand med det samme -- fullføring innebærer flere
+  // Firestore-kall og kan ta litt tid ved store økter, så uten dette
+  // ser det ut som appen henger. Hindrer også dobbelttrykk på knappen.
+  const container = document.getElementById('sluttbane-innhold');
+  container.innerHTML = '<div class="laster"><span class="laster-snurr"></span>Lagrer økt…</div>';
+
   try {
     const resultat = await ratingService.beregnOktResultat(okt.konkurranse, okt.startBaner, sluttbaner);
     await ratingService.fullforOkt(resultat);
@@ -112,6 +118,7 @@ export async function fullforOktRegistrering() {
   } catch (e) {
     console.error('[registerFinish] Kunne ikke fullføre økt:', e);
     visMelding('Noe gikk galt ved lagring. Prøv igjen.', 'feil');
+    tegn(); // gjenopprett skjermen slik at admin kan prøve på nytt
   }
 }
 window.fullforOktRegistrering = fullforOktRegistrering;

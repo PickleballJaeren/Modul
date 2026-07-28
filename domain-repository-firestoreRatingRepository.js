@@ -55,9 +55,20 @@ export function lagFirestoreRatingRepository() {
     });
 
     // 2. oppdater rating + historikk + fremgang per spiller
+    // Les eksisterende rating for ALLE spillere parallelt først -- dette er
+    // den delen som skalerer dårlig sekvensielt ved store økter (28
+    // spillere = 28 rundturer). Selve skrivingen under går rett i batchen
+    // og er billig, så den holdes i en enkel løkke.
+    const eksisterendeMap = new Map(
+      await Promise.all(oktResultat.resultatPerSpiller.map(async r => {
+        const eksisterende = await hentRatingForKategori(r.spillerId, r.kategori);
+        return [ratingDokId(r.spillerId, r.kategori), eksisterende];
+      })),
+    );
+
     for (const r of oktResultat.resultatPerSpiller) {
       const ratingRef = doc(db, SAM.PLAYER_CATEGORY_RATINGS, ratingDokId(r.spillerId, r.kategori));
-      const eksisterende = await hentRatingForKategori(r.spillerId, r.kategori);
+      const eksisterende = eksisterendeMap.get(ratingDokId(r.spillerId, r.kategori));
       const historikk = eksisterende?.historikk ?? [];
       historikk.push({
         dato: new Date().toISOString(),
