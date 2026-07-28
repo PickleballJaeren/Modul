@@ -4,7 +4,6 @@
 // ════════════════════════════════════════════════════════
 
 export const STARTRATING = 1000;
-export const REFERANSE_STD = 100;      // brukt til å reskalere allround-z til Elo-skala
 export const PROVISIONAL_TRENINGER = 5; // antall treninger for status = etablert
 export const ANTALL_BANER_MAKS = 14;
 

@@ -30,7 +30,9 @@ function tegnListe() {
   const okt = hentOkt();
   const container = document.getElementById('registrer-deltakere-innhold');
 
-  const radHtml = [...spillerKart.entries()].map(([id, navn]) => {
+  const radHtml = [...spillerKart.entries()]
+    .sort((a, b) => a[1].localeCompare(b[1], 'no'))
+    .map(([id, navn]) => {
     const valgt = erDeltaker(id);
     return `
     <div class="sl-spillervelger-rad${valgt ? ' valgt' : ''}" onclick="window.veksleSpillerValgt('${id}')">

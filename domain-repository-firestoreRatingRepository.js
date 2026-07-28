@@ -8,8 +8,7 @@
 // ════════════════════════════════════════════════════════
 
 import {
-  db, SAM, doc, collection, getDoc, setDoc, getDocs, query, where,
-  serverTimestamp,
+  db, SAM, doc, getDoc, setDoc, serverTimestamp,
 } from './firebase.js';
 import { lagBatchHjelper } from './batch-helpers.js';
 import { nesteFremgang } from './domain-rating-provisionalPolicy.js';
@@ -27,16 +26,6 @@ export function lagFirestoreRatingRepository() {
   async function hentFremgangForKonkurranse(spillerId, konkurranse) {
     const snap = await getDoc(doc(db, SAM.PLAYER_COMPETITION_PROGRESS, fremgangDokId(spillerId, konkurranse)));
     return snap.exists() ? snap.data() : null;
-  }
-
-  async function hentEtablerteRatinger(kategori) {
-    const q = query(
-      collection(db, SAM.PLAYER_CATEGORY_RATINGS),
-      where('kategori', '==', kategori),
-      where('status', '==', 'established'),
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map(d => d.data().elo);
   }
 
   async function lagreAllround(spillerId, allroundVerdi) {
@@ -103,7 +92,6 @@ export function lagFirestoreRatingRepository() {
   return {
     hentRatingForKategori,
     hentFremgangForKonkurranse,
-    hentEtablerteRatinger,
     lagreAllround,
     lagreOktResultat,
   };

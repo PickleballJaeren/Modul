@@ -9,7 +9,6 @@
 // Repository-kontrakt (IRatingRepository) forventet av denne servicen:
 //   hentRatingForKategori(spillerId, kategori)        -> { elo, historikk } | null
 //   hentFremgangForKonkurranse(spillerId, konkurranse) -> { treningsAntall, status } | null
-//   hentEtablerteRatinger(kategori)                    -> number[]
 //   lagreOktResultat(oktResultat)                      -> Promise<void>
 // ════════════════════════════════════════════════════════
 
@@ -99,17 +98,13 @@ export function lagRatingService({
   /** Regner ut og lagrer allround-rating for én spiller på nytt. */
   async function oppdaterAllround(spillerId) {
     const ratingerPerKategori = {};
-    const statistikkPerKategori = {};
 
     for (const kategori of ALLE_KATEGORIER) {
       const rating = await repository.hentRatingForKategori(spillerId, kategori);
       if (rating) ratingerPerKategori[kategori] = rating.elo;
-
-      const populasjon = await repository.hentEtablerteRatinger(kategori);
-      statistikkPerKategori[kategori] = allroundKalkulator.beregnPopulasjonsstatistikk(populasjon);
     }
 
-    const allround = allroundKalkulator.beregnAllround(ratingerPerKategori, statistikkPerKategori);
+    const allround = allroundKalkulator.beregnAllround(ratingerPerKategori);
     await repository.lagreAllround(spillerId, allround);
     return allround;
   }
