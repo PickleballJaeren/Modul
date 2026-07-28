@@ -120,47 +120,47 @@ async function tegnListe() {
 // profilen, ikke som egen linje i grafen.
 // ════════════════════════════════════════════════════════
 function byggRatingSvg(historikkPerKategori) {
-  const alleTider = [];
-  const alleVerdier = [];
-  Object.values(historikkPerKategori).forEach(liste => liste.forEach(h => {
-    alleTider.push(new Date(h.dato).getTime());
-    alleVerdier.push(h.eloEtter);
-  }));
+  // Flat ut ALLE økter på tvers av kategorier (inkl. Allround), med
+  // kategori-tag. Disse rangeres kronologisk og gis en delt indeks
+  // (løpenummer) i stedet for faktisk klokkeslett -- ellers ser økter
+  // spilt få minutter fra hverandre ut som om det er dager mellom dem,
+  // og økter spilt tett i tid (f.eks. samme trening) blir urettmessig
+  // spredt utover hele bredden. Med indeks blir avstanden mellom to
+  // punkter i stedet "hvor mye annen aktivitet skjedde mellom dem" --
+  // et langt mer meningsfullt mål enn rå tid.
+  const alleEntries = [];
+  Object.entries(historikkPerKategori).forEach(([kategori, liste]) => {
+    liste.forEach(h => alleEntries.push({ kategori, eloEtter: h.eloEtter, tid: new Date(h.dato).getTime() }));
+  });
 
-  if (alleTider.length === 0) {
+  if (alleEntries.length === 0) {
     return '<div class="tom-tilstand-liten">Ingen historikk ennå</div>';
   }
 
-  // Uten et felles startpunkt begynner hver kategori-linje ved sitt eget
-  // første tidsstempel -- en kategori spilt sent på dagen ville da flyte
-  // langt til høyre i stedet for å starte ved venstre kant sammen med de
-  // andre. Vi setter derfor inn ett kunstig punkt (STARTRATING) rett før
-  // den aller tidligste registrerte økten, felles for alle kategorier.
-  const startT = Math.min(...alleTider) - 1;
-  const historikkMedStart = {};
-  Object.entries(historikkPerKategori).forEach(([kategori, liste]) => {
-    historikkMedStart[kategori] = liste.length
-      ? [{ dato: new Date(startT).toISOString(), eloEtter: STARTRATING }, ...liste]
-      : liste;
-  });
+  alleEntries.sort((a, b) => a.tid - b.tid);
+  alleEntries.forEach((e, i) => { e.indeks = i + 1; }); // indeks 0 er reservert til det felles startpunktet (STARTRATING)
 
-  const minT = startT;
-  const maxT = Math.max(...alleTider);
+  const alleVerdier = alleEntries.map(e => e.eloEtter);
   const minV = Math.min(...alleVerdier, STARTRATING) - 20;
   const maxV = Math.max(...alleVerdier, STARTRATING) + 20;
+  const maksIndeks = alleEntries.length;
 
   const bredde = 440, hoyde = 240, padL = 58, padB = 20, padT = 10, padR = 10;
-  const skalaX = t => padL + (maxT === minT ? (bredde - padL - padR) / 2 : ((t - minT) / (maxT - minT)) * (bredde - padL - padR));
+  const skalaX = i => padL + (maksIndeks === 0 ? 0 : (i / maksIndeks) * (bredde - padL - padR));
   const skalaY = v => padT + (1 - (v - minV) / ((maxV - minV) || 1)) * (hoyde - padT - padB);
 
+  const perKategori = {};
+  Object.keys(historikkPerKategori).forEach(k => { perKategori[k] = []; });
+  alleEntries.forEach(e => perKategori[e.kategori].push(e));
+
   let linjer = '';
-  Object.entries(historikkMedStart).forEach(([kategori, liste]) => {
-    if (!liste.length) return;
-    const sortert = [...liste].sort((a, b) => new Date(a.dato) - new Date(b.dato));
-    const punkter = sortert.map(h => `${skalaX(new Date(h.dato).getTime()).toFixed(1)},${skalaY(h.eloEtter).toFixed(1)}`).join(' ');
+  Object.entries(perKategori).forEach(([kategori, entries]) => {
+    if (!entries.length) return;
+    const medStart = [{ indeks: 0, eloEtter: STARTRATING }, ...entries];
+    const punkter = medStart.map(e => `${skalaX(e.indeks).toFixed(1)},${skalaY(e.eloEtter).toFixed(1)}`).join(' ');
     linjer += `<polyline points="${punkter}" fill="none" stroke="${KATEGORI_FARGE_HEX[kategori]}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />`;
-    sortert.forEach(h => {
-      linjer += `<circle cx="${skalaX(new Date(h.dato).getTime()).toFixed(1)}" cy="${skalaY(h.eloEtter).toFixed(1)}" r="2.5" fill="${KATEGORI_FARGE_HEX[kategori]}" />`;
+    medStart.forEach(e => {
+      linjer += `<circle cx="${skalaX(e.indeks).toFixed(1)}" cy="${skalaY(e.eloEtter).toFixed(1)}" r="2.5" fill="${KATEGORI_FARGE_HEX[kategori]}" />`;
     });
   });
 
