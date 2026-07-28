@@ -131,7 +131,20 @@ function byggRatingSvg(historikkPerKategori) {
     return '<div class="tom-tilstand-liten">Ingen historikk ennå</div>';
   }
 
-  const minT = Math.min(...alleTider);
+  // Uten et felles startpunkt begynner hver kategori-linje ved sitt eget
+  // første tidsstempel -- en kategori spilt sent på dagen ville da flyte
+  // langt til høyre i stedet for å starte ved venstre kant sammen med de
+  // andre. Vi setter derfor inn ett kunstig punkt (STARTRATING) rett før
+  // den aller tidligste registrerte økten, felles for alle kategorier.
+  const startT = Math.min(...alleTider) - 1;
+  const historikkMedStart = {};
+  Object.entries(historikkPerKategori).forEach(([kategori, liste]) => {
+    historikkMedStart[kategori] = liste.length
+      ? [{ dato: new Date(startT).toISOString(), eloEtter: STARTRATING }, ...liste]
+      : liste;
+  });
+
+  const minT = startT;
   const maxT = Math.max(...alleTider);
   const minV = Math.min(...alleVerdier, STARTRATING) - 20;
   const maxV = Math.max(...alleVerdier, STARTRATING) + 20;
@@ -141,7 +154,7 @@ function byggRatingSvg(historikkPerKategori) {
   const skalaY = v => padT + (1 - (v - minV) / ((maxV - minV) || 1)) * (hoyde - padT - padB);
 
   let linjer = '';
-  Object.entries(historikkPerKategori).forEach(([kategori, liste]) => {
+  Object.entries(historikkMedStart).forEach(([kategori, liste]) => {
     if (!liste.length) return;
     const sortert = [...liste].sort((a, b) => new Date(a.dato) - new Date(b.dato));
     const punkter = sortert.map(h => `${skalaX(new Date(h.dato).getTime()).toFixed(1)},${skalaY(h.eloEtter).toFixed(1)}`).join(' ');
