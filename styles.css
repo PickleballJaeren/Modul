@@ -238,3 +238,11 @@ label{font-size:14px;color:var(--muted2);display:block;margin-bottom:4px}
    kun spillerlisten (.scroll-omrade) scroller internt. Låser derfor
    akkurat denne skjermen til viewport-høyden. ── */
 #skjerm-registrer-deltakere{height:100vh;height:100dvh;overflow:hidden}
+
+/* ── Deltakervelger: valgt rad blir solid grønn (samme metning som
+   knapp-primaer sin blåfarge) i stedet for hake/pluss-ikon. Plassert
+   ETTER :active-regelen over, slik at denne vinner ved lik
+   spesifisitet -- ellers ville :active (ved trykk) midlertidig
+   overstyrt den grønne bakgrunnen. ── */
+.sl-spillervelger-rad.valgt{background:var(--green2)}
+.sl-spillervelger-rad.valgt span{color:#052e16;font-weight:500}

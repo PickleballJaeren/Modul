@@ -44,30 +44,32 @@ function tegn() {
   document.getElementById('sluttbane-teller').textContent =
     `${okt.plasseringer.length} av ${okt.deltakerIder.length}`;
 
-  const uplassert = okt.deltakerIder.filter(id => !okt.plasseringer.includes(id));
-
-  const plassertHtml = okt.plasseringer.map(id => {
+  // Spillerne vises alltid i SAMME rekkefølge (okt.deltakerIder), uansett
+  // hvem som er plassert eller ikke -- de flyttes ALDRI til en egen liste.
+  // Tidligere lå plasserte spillere i en liste over de uplasserte, som
+  // vokste for hvert trykk og dyttet resten av teksten nedover. Nå
+  // endres kun den ene raden som trykkes (dempes + får banenummer),
+  // resten av listen står helt i ro.
+  const raderHtml = okt.deltakerIder.map(id => {
+    const erPlassert = okt.plasseringer.includes(id);
+    if (!erPlassert) {
+      return `
+        <div class="sl-spillervelger-rad" onclick="window.plasserSpillerNeste('${id}')">
+          <span>${escHtml(hentSpillerNavn(id))}</span>
+          <span style="color:var(--muted2);font-size:16px">+</span>
+        </div>
+      `;
+    }
     const startBaneNr = finnStartBane(okt.startBaner, id);
     const sluttBaneNr = sluttbaner.get(id);
     return `
-      <div class="bane-rad">
-        <span class="bane-nr">${String(sluttBaneNr).padStart(2, '0')}</span>
-        <span class="bane-navn" style="flex:1">${escHtml(hentSpillerNavn(id))}</span>
+      <div class="sl-spillervelger-rad" style="opacity:0.45;cursor:default">
+        <span class="bane-nr" style="margin-right:10px">${String(sluttBaneNr).padStart(2, '0')}</span>
+        <span style="flex:1">${escHtml(hentSpillerNavn(id))}</span>
         ${bevegelseBadge(startBaneNr, sluttBaneNr)}
       </div>
     `;
   }).join('');
-
-  const uplassertHtml = uplassert.length ? `
-    <div class="seksjon-etikett">Ikke plassert, trykk for neste bane</div>
-    <div class="sl-spillervelger-treff" style="max-height:none">
-      ${uplassert.map(id => `
-        <div class="sl-spillervelger-rad" onclick="window.plasserSpillerNeste('${id}')">
-          <span>${escHtml(hentSpillerNavn(id))}</span>
-        </div>
-      `).join('')}
-    </div>
-  ` : '';
 
   const fullforHtml = erFerdigPlassert()
     ? `<button class="knapp knapp-primaer" style="margin-top:16px" onclick="window.fullforOktRegistrering()">Fullfør økt</button>`
@@ -77,8 +79,9 @@ function tegn() {
     ${okt.plasseringer.length ? `
       <button class="knapp knapp-omriss" style="margin-bottom:16px" onclick="window.angreSisteSluttbane()">↩ Angre siste</button>
     ` : ''}
-    ${plassertHtml}
-    ${uplassertHtml}
+    <div class="sl-spillervelger-treff" style="max-height:none">
+      ${raderHtml}
+    </div>
     ${fullforHtml}
   `;
 }

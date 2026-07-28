@@ -30,12 +30,15 @@ function tegnListe() {
   const okt = hentOkt();
   const container = document.getElementById('registrer-deltakere-innhold');
 
-  const radHtml = [...spillerKart.entries()].map(([id, navn]) => `
-    <div class="sl-spillervelger-rad" onclick="window.veksleSpillerValgt('${id}')">
+  const radHtml = [...spillerKart.entries()].map(([id, navn]) => {
+    const valgt = erDeltaker(id);
+    return `
+    <div class="sl-spillervelger-rad${valgt ? ' valgt' : ''}" onclick="window.veksleSpillerValgt('${id}')">
       <span>${escHtml(navn)}</span>
-      <span>${erDeltaker(id) ? '✓' : '+'}</span>
+      ${valgt ? '' : '<span style="color:var(--muted2);font-size:16px">+</span>'}
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   container.innerHTML = `
     <div class="sl-spillervelger-treff" style="max-height:none">
