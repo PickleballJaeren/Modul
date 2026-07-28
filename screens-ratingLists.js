@@ -119,6 +119,36 @@ async function tegnListe() {
 // ikke som historikk over tid -- den vises derfor kun i toppen av
 // profilen, ikke som egen linje i grafen.
 // ════════════════════════════════════════════════════════
+/**
+ * Bygger en jevn kurve (SVG path) gjennom et sett punkter, i stedet for
+ * rette linjesegmenter. Catmull-Rom konvertert til kubiske Bezier-kurver
+ * -- kurven går NØYAKTIG gjennom hvert punkt (i motsetning til f.eks.
+ * en enkel bezier-glatting), så verdien på hvert punkt forblir korrekt
+ * avlesbar, den buer bare mellom dem i stedet for å knekke.
+ */
+function byggGlattPath(punkter) {
+  if (punkter.length < 2) return '';
+  if (punkter.length === 2) {
+    return `M ${punkter[0].x.toFixed(1)},${punkter[0].y.toFixed(1)} L ${punkter[1].x.toFixed(1)},${punkter[1].y.toFixed(1)}`;
+  }
+
+  let d = `M ${punkter[0].x.toFixed(1)},${punkter[0].y.toFixed(1)}`;
+  for (let i = 0; i < punkter.length - 1; i++) {
+    const p0 = punkter[i - 1] ?? punkter[i];
+    const p1 = punkter[i];
+    const p2 = punkter[i + 1];
+    const p3 = punkter[i + 2] ?? p2;
+
+    const c1x = p1.x + (p2.x - p0.x) / 6;
+    const c1y = p1.y + (p2.y - p0.y) / 6;
+    const c2x = p2.x - (p3.x - p1.x) / 6;
+    const c2y = p2.y - (p3.y - p1.y) / 6;
+
+    d += ` C ${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
+
 function byggRatingSvg(historikkPerKategori) {
   // Flat ut ALLE økter på tvers av kategorier (inkl. Allround), med
   // kategori-tag. Disse rangeres kronologisk og gis en delt indeks
@@ -157,8 +187,9 @@ function byggRatingSvg(historikkPerKategori) {
   Object.entries(perKategori).forEach(([kategori, entries]) => {
     if (!entries.length) return;
     const medStart = [{ indeks: 0, eloEtter: STARTRATING }, ...entries];
-    const punkter = medStart.map(e => `${skalaX(e.indeks).toFixed(1)},${skalaY(e.eloEtter).toFixed(1)}`).join(' ');
-    linjer += `<polyline points="${punkter}" fill="none" stroke="${KATEGORI_FARGE_HEX[kategori]}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />`;
+    const punkter = medStart.map(e => ({ x: skalaX(e.indeks), y: skalaY(e.eloEtter) }));
+    const path = byggGlattPath(punkter);
+    linjer += `<path d="${path}" fill="none" stroke="${KATEGORI_FARGE_HEX[kategori]}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />`;
     medStart.forEach(e => {
       linjer += `<circle cx="${skalaX(e.indeks).toFixed(1)}" cy="${skalaY(e.eloEtter).toFixed(1)}" r="2.5" fill="${KATEGORI_FARGE_HEX[kategori]}" />`;
     });
