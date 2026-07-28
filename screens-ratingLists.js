@@ -109,16 +109,6 @@ async function tegnListe() {
   `).join('');
 }
 
-// ════════════════════════════════════════════════════════
-// SPILLERPROFIL — trykk et navn i ratinglisten for å se rating
-// over tid per kategori (håndtegnet SVG, ingen ekstern chart-lib
-// siden appen er en offline-PWA og sw.js kun cacher egne filer),
-// pluss de siste 10 øktene med sluttbane og elo-endring.
-//
-// Merk: Allround lagres kun som gjeldende verdi (playerAllround),
-// ikke som historikk over tid -- den vises derfor kun i toppen av
-// profilen, ikke som egen linje i grafen.
-// ════════════════════════════════════════════════════════
 /**
  * Bygger en jevn kurve (SVG path) gjennom et sett punkter, i stedet for
  * rette linjesegmenter. Catmull-Rom konvertert til kubiske Bezier-kurver
@@ -149,49 +139,150 @@ function byggGlattPath(punkter) {
   return d;
 }
 
-function byggRatingSvg(historikkPerKategori) {
-  // Flat ut ALLE økter på tvers av kategorier (inkl. Allround), med
-  // kategori-tag. Disse rangeres kronologisk og gis en delt indeks
-  // (løpenummer) i stedet for faktisk klokkeslett -- ellers ser økter
-  // spilt få minutter fra hverandre ut som om det er dager mellom dem,
-  // og økter spilt tett i tid (f.eks. samme trening) blir urettmessig
-  // spredt utover hele bredden. Med indeks blir avstanden mellom to
-  // punkter i stedet "hvor mye annen aktivitet skjedde mellom dem" --
-  // et langt mer meningsfullt mål enn rå tid.
-  const alleEntries = [];
-  Object.entries(historikkPerKategori).forEach(([kategori, liste]) => {
-    liste.forEach(h => alleEntries.push({ kategori, eloEtter: h.eloEtter, tid: new Date(h.dato).getTime() }));
+/**
+ * Lineær interpolasjon av elo-verdi ved en gitt x-posisjon, gitt en
+ * kronologisk sortert punktliste [{x, elo}]. Returnerer null hvis
+ * punktlisten ikke har rukket så langt (siste punkt ligger før x) --
+ * det tolkes som at kategorien/linjen ikke har "nådd eller passert" x.
+ */
+function interpolerVedX(punkter, x) {
+  if (!punkter.length) return null;
+  const siste = punkter[punkter.length - 1];
+  if (siste.x < x) return null;
+  if (punkter[0].x > x) return null;
+  for (let i = 0; i < punkter.length - 1; i++) {
+    const a = punkter[i], b = punkter[i + 1];
+    if (x >= a.x && x <= b.x) {
+      if (b.x === a.x) return b.elo;
+      const t = (x - a.x) / (b.x - a.x);
+      return a.elo + t * (b.elo - a.elo);
+    }
+  }
+  return siste.elo;
+}
+
+/**
+ * Regner ut hvor på x-aksen hver treningsøkt skal plottes, og avleder
+ * Allround-linjen fra kategori-historikkene (Allround lagres IKKE lenger
+ * som egen historikk i Firestore -- kun som gjeldende tall, se
+ * apneSpillerprofil()).
+ *
+ * X-AKSEN: delt "vannmerke" på tvers av alle kategorier, IKKE tid og
+ * IKKE hver kategoris egen løpende opptelling. Regelen, for hver
+ * hendelse i kronologisk rekkefølge (uansett kategori):
+ *   - Hvis kategorien IKKE allerede har et punkt på gjeldende vannmerke
+ *     -> plasseres DER (tar igjen de andre kategoriene).
+ *   - Hvis kategorien ALLEREDE har et punkt der (kolliderer med sitt
+ *     eget forrige punkt) -> vannmerket skyves ett hakk, og hendelsen
+ *     plasseres på det nye.
+ * Dette gjør at en kategori som ikke er spilt på en stund "tar igjen"
+ * lederen i stedet for å starte på nytt ved 1, og at to kategorier som
+ * spilles rett etter hverandre aldri havner på nøyaktig samme punkt.
+ *
+ * ALLROUND: får et NYTT punkt kun der to eller flere kategorier faktisk
+ * har et EKTE punkt på samme x (der en kategori tar igjen en annen) --
+ * ikke etter hver eneste økt. Verdien er snittet av ALLE kategorier som
+ * har nådd eller passert x, der kategorier som bare passerer gjennom
+ * (har et senere punkt lenger ute) bidrar med en interpolert verdi.
+ *
+ * RULLERENDE VINDU: aldri mer enn 10 punkter vises på x-aksen -- eldre
+ * historikk ruller ut til venstre, med interpolerte "startpunkt" ved
+ * vinduets venstre kant slik at linjene forblir sammenhengende.
+ */
+function beregnGrafmodell(historikkPerKategori) {
+  const kategorier = Object.keys(historikkPerKategori);
+  const hendelser = [];
+  kategorier.forEach(kategori => {
+    (historikkPerKategori[kategori] || []).forEach(h => {
+      hendelser.push({ kategori, elo: h.eloEtter, tid: new Date(h.dato).getTime() });
+    });
+  });
+  hendelser.sort((a, b) => a.tid - b.tid);
+
+  if (hendelser.length === 0) {
+    return { punkterPerKategori: {}, allroundPunkter: [], domeneMaks: 0 };
+  }
+
+  // Steg 1: delt vannmerke
+  let vannmerke = 0;
+  const sistePos = {};
+  const raPunkterPerKategori = {};
+  kategorier.forEach(k => { raPunkterPerKategori[k] = []; });
+
+  hendelser.forEach(h => {
+    const forrige = sistePos[h.kategori] ?? 0;
+    if (forrige === vannmerke) vannmerke += 1;
+    const pos = vannmerke;
+    sistePos[h.kategori] = pos;
+    raPunkterPerKategori[h.kategori].push({ x: pos, elo: h.elo });
   });
 
-  if (alleEntries.length === 0) {
+  const medStart = {};
+  kategorier.forEach(k => { medStart[k] = [{ x: 0, elo: STARTRATING }, ...raPunkterPerKategori[k]]; });
+
+  // Steg 2: Allround kun ved konvergens (>=2 kategorier med EKTE punkt på samme x)
+  const eksaktePosisjoner = {};
+  kategorier.forEach(k => {
+    raPunkterPerKategori[k].forEach(p => {
+      eksaktePosisjoner[p.x] = (eksaktePosisjoner[p.x] ?? 0) + 1;
+    });
+  });
+
+  const allroundRaa = [{ x: 0, elo: STARTRATING }];
+  Object.keys(eksaktePosisjoner)
+    .map(Number)
+    .filter(x => eksaktePosisjoner[x] >= 2)
+    .sort((a, b) => a - b)
+    .forEach(x => {
+      const verdier = kategorier.map(k => interpolerVedX(medStart[k], x)).filter(v => v !== null);
+      if (verdier.length) allroundRaa.push({ x, elo: verdier.reduce((s, v) => s + v, 0) / verdier.length });
+    });
+
+  // Steg 3: rullerende vindu -- maks 10 punkter på x-aksen
+  const domeneMaks = Math.min(vannmerke, 10);
+  const cutoff = Math.max(0, vannmerke - 10);
+
+  function tilVindu(punkter) {
+    if (cutoff === 0) return punkter;
+    const synligStart = interpolerVedX(punkter, cutoff);
+    const resten = punkter.filter(p => p.x > cutoff).map(p => ({ x: p.x - cutoff, elo: p.elo }));
+    return synligStart === null ? resten : [{ x: 0, elo: synligStart }, ...resten];
+  }
+
+  const punkterPerKategori = {};
+  kategorier.forEach(k => {
+    const vindu = tilVindu(medStart[k]);
+    if (vindu.length) punkterPerKategori[k] = vindu;
+  });
+  const allroundPunkter = tilVindu(allroundRaa);
+
+  return { punkterPerKategori, allroundPunkter, domeneMaks };
+}
+
+function byggRatingSvg(historikkPerKategori) {
+  const { punkterPerKategori, allroundPunkter, domeneMaks } = beregnGrafmodell(historikkPerKategori);
+
+  if (domeneMaks === 0) {
     return '<div class="tom-tilstand-liten">Ingen historikk ennå</div>';
   }
 
-  alleEntries.sort((a, b) => a.tid - b.tid);
-  alleEntries.forEach((e, i) => { e.indeks = i + 1; }); // indeks 0 er reservert til det felles startpunktet (STARTRATING)
-
-  const alleVerdier = alleEntries.map(e => e.eloEtter);
+  const alleLinjer = { ...punkterPerKategori, allround: allroundPunkter };
+  const alleVerdier = Object.values(alleLinjer).flat().map(p => p.elo);
   const minV = Math.min(...alleVerdier, STARTRATING) - 20;
   const maxV = Math.max(...alleVerdier, STARTRATING) + 20;
-  const maksIndeks = alleEntries.length;
 
-  const bredde = 440, hoyde = 240, padL = 58, padB = 20, padT = 10, padR = 10;
-  const skalaX = i => padL + (maksIndeks === 0 ? 0 : (i / maksIndeks) * (bredde - padL - padR));
+  const bredde = 440, hoyde = 240, padL = 58, padB = 30, padT = 10, padR = 10;
+  const skalaX = x => padL + (domeneMaks === 0 ? 0 : (x / domeneMaks) * (bredde - padL - padR));
   const skalaY = v => padT + (1 - (v - minV) / ((maxV - minV) || 1)) * (hoyde - padT - padB);
 
-  const perKategori = {};
-  Object.keys(historikkPerKategori).forEach(k => { perKategori[k] = []; });
-  alleEntries.forEach(e => perKategori[e.kategori].push(e));
-
   let linjer = '';
-  Object.entries(perKategori).forEach(([kategori, entries]) => {
-    if (!entries.length) return;
-    const medStart = [{ indeks: 0, eloEtter: STARTRATING }, ...entries];
-    const punkter = medStart.map(e => ({ x: skalaX(e.indeks), y: skalaY(e.eloEtter) }));
-    const path = byggGlattPath(punkter);
+  Object.entries(alleLinjer).forEach(([kategori, punkter]) => {
+    if (punkter.length < 2) return;
+    const skjermPunkter = punkter.map(p => ({ x: skalaX(p.x), y: skalaY(p.elo) }));
+    const path = byggGlattPath(skjermPunkter);
     linjer += `<path d="${path}" fill="none" stroke="${KATEGORI_FARGE_HEX[kategori]}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />`;
-    medStart.forEach(e => {
-      linjer += `<circle cx="${skalaX(e.indeks).toFixed(1)}" cy="${skalaY(e.eloEtter).toFixed(1)}" r="2.5" fill="${KATEGORI_FARGE_HEX[kategori]}" />`;
+    skjermPunkter.forEach(p => {
+      linjer += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.5" fill="${KATEGORI_FARGE_HEX[kategori]}" />`;
     });
   });
 
@@ -200,11 +291,16 @@ function byggRatingSvg(historikkPerKategori) {
     <text x="4" y="${(skalaY(v) + 4).toFixed(1)}" font-size="15" fill="#64748b">${v.toLocaleString('no-NO')}</text>
   `).join('');
 
+  const xAkseHtml = Array.from({ length: domeneMaks + 1 }, (_, x) => `
+    <text x="${skalaX(x).toFixed(1)}" y="${hoyde - 6}" font-size="13" fill="#64748b" text-anchor="middle">${x}</text>
+  `).join('');
+
   return `
     <svg viewBox="0 0 ${bredde} ${hoyde}" style="width:100%;height:${hoyde}px;display:block">
       <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${hoyde - padB}" stroke="rgba(255,255,255,0.13)" />
       <line x1="${padL}" y1="${hoyde - padB}" x2="${bredde - padR}" y2="${hoyde - padB}" stroke="rgba(255,255,255,0.13)" />
       ${rutenettHtml}
+      ${xAkseHtml}
       ${linjer}
     </svg>
   `;
@@ -217,13 +313,11 @@ async function hentHistorikkForSpiller(spillerId) {
     historikkPerKategori[kategori] = snap.exists() ? (snap.data().historikk ?? []) : [];
   }));
 
-  // Allround-historikken lagres separat (playerAllround), med feltnavnet
-  // "allround" i stedet for "eloEtter" -- oversett formen slik at
-  // byggRatingSvg() kan behandle den likt som kategorilinjene.
-  const allroundSnap = await getDoc(doc(db, SAM.PLAYER_ALLROUND, spillerId));
-  historikkPerKategori.allround = allroundSnap.exists()
-    ? (allroundSnap.data().historikk ?? []).map(h => ({ dato: h.dato, eloEtter: h.allround }))
-    : [];
+  // NB: Allround hentes IKKE lenger her som egen historikk -- den
+  // avledes nå av beregnGrafmodell() fra kategori-historikkene (se
+  // konvergensregelen der). Den lagrede "gjeldende allround"-verdien
+  // (playerAllround.allround) brukes fortsatt, men kun til tall-
+  // visningen øverst i profilen -- hentes direkte i apneSpillerprofil().
 
   // Øktene lagres uten spillerId på toppnivå (kun inni resultatPerSpiller),
   // så vi henter hele samlingen og filtrerer i klienten -- samme mønster
