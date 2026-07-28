@@ -37,7 +37,7 @@ function tegnListe() {
     return `
     <div class="sl-spillervelger-rad${valgt ? ' valgt' : ''}" onclick="window.veksleSpillerValgt('${id}')">
       <span>${escHtml(navn)}</span>
-      ${valgt ? '' : '<span style="color:var(--muted2);font-size:16px">+</span>'}
+      ${valgt ? '<span style="font-size:15px">✓</span>' : '<span style="color:var(--muted2);font-size:16px">+</span>'}
     </div>
   `;
   }).join('');
