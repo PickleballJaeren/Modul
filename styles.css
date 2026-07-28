@@ -229,3 +229,12 @@ label{font-size:14px;color:var(--muted2);display:block;margin-bottom:4px}
 .kat-tekst-defense{color:var(--accent2)}
 .kat-tekst-singles{color:var(--yellow)}
 .rating-fane.aktiv{color:#fff}
+
+/* ── Registrer deltakere: knapperad ("Start økt" + "Legg til") ligger
+   MELLOM app-header og .scroll-omrade, altså utenfor selve scroll-
+   området. Uten dette lager reglet vokser .screen (som bare har
+   min-height:100vh) forbi viewporten når spillerlisten blir lang, og
+   da scroller hele siden -- inkludert knapperaden -- i stedet for at
+   kun spillerlisten (.scroll-omrade) scroller internt. Låser derfor
+   akkurat denne skjermen til viewport-høyden. ── */
+#skjerm-registrer-deltakere{height:100vh;height:100dvh;overflow:hidden}
