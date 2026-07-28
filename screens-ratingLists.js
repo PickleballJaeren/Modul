@@ -120,50 +120,46 @@ async function tegnListe() {
 // profilen, ikke som egen linje i grafen.
 // ════════════════════════════════════════════════════════
 function byggRatingSvg(historikkPerKategori) {
-  // Hver kategori indekseres NÅ uavhengig av de andre -- indeks 1 er
-  // alltid "første synlige økt" for akkurat den kategorien, ikke en
-  // delt kronologisk rekkefølge på tvers av alle fem linjer (se
-  // tidligere versjon). Vinduet er begrenset til de 10 siste øktene
-  // per kategori (rullerende): så snart en kategori passerer 10
-  // registrerte økter, forsvinner BÅDE det kunstige startpunktet
-  // (indeks 0 = STARTRATING) OG de eldste øktene permanent -- slik at
-  // x-aksen alltid viser fast indeks 0-10, og to kategorier med like
-  // mange økter alltid får like lange linjer, uavhengig av hvilket
-  // faktisk klokkeslett øktene ble spilt på.
-  const VINDU = 10;
-  const perKategori = {};
-  let harData = false;
-
+  // Flat ut ALLE økter på tvers av kategorier (inkl. Allround), med
+  // kategori-tag. Disse rangeres kronologisk og gis en delt indeks
+  // (løpenummer) i stedet for faktisk klokkeslett -- ellers ser økter
+  // spilt få minutter fra hverandre ut som om det er dager mellom dem,
+  // og økter spilt tett i tid (f.eks. samme trening) blir urettmessig
+  // spredt utover hele bredden. Med indeks blir avstanden mellom to
+  // punkter i stedet "hvor mye annen aktivitet skjedde mellom dem" --
+  // et langt mer meningsfullt mål enn rå tid.
+  const alleEntries = [];
   Object.entries(historikkPerKategori).forEach(([kategori, liste]) => {
-    if (!liste.length) { perKategori[kategori] = []; return; }
-    harData = true;
-    const sortert = [...liste].sort((a, b) => new Date(a.dato) - new Date(b.dato));
-    const rullet = sortert.length > VINDU ? sortert.slice(sortert.length - VINDU) : sortert;
-    const medIndeks = rullet.map((h, i) => ({ indeks: i + 1, eloEtter: h.eloEtter }));
-    perKategori[kategori] = sortert.length > VINDU
-      ? medIndeks // over 10 økter -- startpunktet er rullet ut og vises ikke lenger
-      : [{ indeks: 0, eloEtter: STARTRATING }, ...medIndeks];
+    liste.forEach(h => alleEntries.push({ kategori, eloEtter: h.eloEtter, tid: new Date(h.dato).getTime() }));
   });
 
-  if (!harData) {
+  if (alleEntries.length === 0) {
     return '<div class="tom-tilstand-liten">Ingen historikk ennå</div>';
   }
 
-  const alleVerdier = Object.values(perKategori).flat().map(e => e.eloEtter);
+  alleEntries.sort((a, b) => a.tid - b.tid);
+  alleEntries.forEach((e, i) => { e.indeks = i + 1; }); // indeks 0 er reservert til det felles startpunktet (STARTRATING)
+
+  const alleVerdier = alleEntries.map(e => e.eloEtter);
   const minV = Math.min(...alleVerdier, STARTRATING) - 20;
   const maxV = Math.max(...alleVerdier, STARTRATING) + 20;
-  const maksIndeks = VINDU; // fast akse 0-10, uavhengig av faktiske øktantall
+  const maksIndeks = alleEntries.length;
 
   const bredde = 440, hoyde = 240, padL = 58, padB = 20, padT = 10, padR = 10;
-  const skalaX = i => padL + (i / maksIndeks) * (bredde - padL - padR);
+  const skalaX = i => padL + (maksIndeks === 0 ? 0 : (i / maksIndeks) * (bredde - padL - padR));
   const skalaY = v => padT + (1 - (v - minV) / ((maxV - minV) || 1)) * (hoyde - padT - padB);
+
+  const perKategori = {};
+  Object.keys(historikkPerKategori).forEach(k => { perKategori[k] = []; });
+  alleEntries.forEach(e => perKategori[e.kategori].push(e));
 
   let linjer = '';
   Object.entries(perKategori).forEach(([kategori, entries]) => {
     if (!entries.length) return;
-    const punkter = entries.map(e => `${skalaX(e.indeks).toFixed(1)},${skalaY(e.eloEtter).toFixed(1)}`).join(' ');
+    const medStart = [{ indeks: 0, eloEtter: STARTRATING }, ...entries];
+    const punkter = medStart.map(e => `${skalaX(e.indeks).toFixed(1)},${skalaY(e.eloEtter).toFixed(1)}`).join(' ');
     linjer += `<polyline points="${punkter}" fill="none" stroke="${KATEGORI_FARGE_HEX[kategori]}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />`;
-    entries.forEach(e => {
+    medStart.forEach(e => {
       linjer += `<circle cx="${skalaX(e.indeks).toFixed(1)}" cy="${skalaY(e.eloEtter).toFixed(1)}" r="2.5" fill="${KATEGORI_FARGE_HEX[kategori]}" />`;
     });
   });
