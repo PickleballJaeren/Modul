@@ -98,10 +98,22 @@ export function hentRatingService() { return ratingService; }
 let aktivKlubbId = null;
 let spillerKart = null; // Map<spillerId, navn>, gyldig for aktivKlubbId
 
+// Overlay-cache for spillernavn som IKKE finnes i players-samlingen --
+// typisk manuelt tillagte spillere (se leggTilManuellSpiller() i
+// screens-registerPlayers.js), som kun eksisterer i minnet til den som
+// la dem til og aldri skrives til Firestore. Holdt ADSKILT fra
+// spillerKart (i stedet for å skrive inn i den) fordi hentSpillerKart()
+// bruker "spillerKart er satt" som signal på at den ALLEREDE har hentet
+// fra Firestore -- om vi skrev inn her først ville det signalet blitt
+// feilaktig utløst før det ekte oppslaget noen gang skjedde, og ekte
+// spillernavn ville aldri blitt lastet for en tilskuer.
+let ekstraSpillerNavn = new Map();
+
 export function settAktivKlubbId(id) {
   if (id !== aktivKlubbId) {
     aktivKlubbId = id;
     spillerKart = null; // ny klubb -- forkast forrige klubbs cache
+    ekstraSpillerNavn = new Map();
   }
 }
 
@@ -127,7 +139,20 @@ export function leggTilLokalt(spillerId, navn) {
 }
 
 export function navnFor(spillerId) {
-  return spillerKart?.get(spillerId) ?? spillerId;
+  return spillerKart?.get(spillerId) ?? ekstraSpillerNavn.get(spillerId) ?? spillerId;
+}
+
+/**
+ * Fletter inn spillernavn mottatt fra en delt økt (activeSessions) i
+ * overlay-cachen -- dekker manuelt tillagte spillere, som en tilskuer
+ * ellers aldri ville kunnet slå opp navnet på (se byggSpillerNavnKart()
+ * lenger ned, som legger disse ved når økten deles/fullføres).
+ */
+export function flettInnSpillerNavn(spillerNavnKart) {
+  if (!spillerNavnKart) return;
+  Object.entries(spillerNavnKart).forEach(([id, navn]) => {
+    if (!ekstraSpillerNavn.has(id)) ekstraSpillerNavn.set(id, navn);
+  });
 }
 
 // ── Aktiv økt, delt via Firestore ───────────────────────
@@ -147,6 +172,18 @@ function aktivOktRef() {
   return klubbId ? doc(db, SAM.AKTIV_OKT, klubbId) : null;
 }
 
+/**
+ * Bygger et lite navnekart {spillerId: navn} for de gitte spiller-IDene,
+ * for å legges ved når økten deles/fullføres -- dette er det ENESTE
+ * stedet en tilskuer kan få tak i navnet på en manuelt tillagt spiller,
+ * siden slike aldri skrives til players-samlingen (se navnFor() over).
+ */
+function byggSpillerNavnKart(spillerIder) {
+  const kart = {};
+  spillerIder.forEach(id => { kart[id] = navnFor(id); });
+  return kart;
+}
+
 /** Skriver hele den lokale okt-tilstanden til Firestore. No-op uten klubb/baner. */
 export async function lagreAktivOktTilSky() {
   const ref = aktivOktRef();
@@ -157,6 +194,7 @@ export async function lagreAktivOktTilSky() {
     deltakerIder: okt.deltakerIder,
     startBaner: okt.startBaner,
     plasseringer: okt.plasseringer,
+    spillerNavn: byggSpillerNavnKart(okt.deltakerIder),
     oppdatert: serverTimestamp(),
   });
 }
@@ -173,10 +211,12 @@ export async function lagreAktivOktTilSky() {
 export async function fullforAktivOktISky(resultat) {
   const ref = aktivOktRef();
   if (!ref) return;
+  const ider = resultat.resultatPerSpiller.map(r => r.spillerId);
   await setDoc(ref, {
     status: 'fullfort',
     konkurranse: resultat.konkurranse,
     resultat,
+    spillerNavn: byggSpillerNavnKart(ider),
     oppdatert: serverTimestamp(),
   });
 }
@@ -197,6 +237,7 @@ export function gjenopprettOktLokalt(data) {
     startBaner: data.startBaner ?? null,
     plasseringer: data.plasseringer ?? [],
   };
+  flettInnSpillerNavn(data.spillerNavn);
 }
 
 /**

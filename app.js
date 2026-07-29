@@ -20,7 +20,7 @@ import * as allroundKalkulator from './domain-rating-allroundCalculator.js';
 import { lagFirestoreRatingRepository } from './domain-repository-firestoreRatingRepository.js';
 import {
   settRatingService, settAktivKlubbId,
-  lyttPaaAktivOkt, stoppAktivOktLytting, gjenopprettOktLokalt,
+  lyttPaaAktivOkt, stoppAktivOktLytting, gjenopprettOktLokalt, flettInnSpillerNavn,
 } from './state.js';
 import { KONKURRANSE_NAVN } from './domain-constants.js';
 
@@ -192,6 +192,9 @@ function haandterAktivOktEndring(data) {
     // Noen fullførte økten -- vis resultatet automatisk for alle som
     // aktivt fulgte den (baneliste/sluttbane), uten å forstyrre noen
     // som er et annet sted i appen (f.eks. arkiv eller ratinglister).
+    // flettInnSpillerNavn() dekker manuelt tillagte spillere, som ikke
+    // finnes i players-samlingen (se navnFor() i state.js).
+    flettInnSpillerNavn(data.spillerNavn);
     if (paAktivOktSkjerm || paSluttbaneSkjerm) visOktResultat(data.resultat);
     return;
   }
@@ -216,6 +219,7 @@ function haandterAktivOktEndring(data) {
 window.apnePagaendeOkt = function () {
   if (!sisteAktivOktData) return;
   if (sisteAktivOktData.status === 'fullfort') {
+    flettInnSpillerNavn(sisteAktivOktData.spillerNavn);
     visOktResultat(sisteAktivOktData.resultat);
     return;
   }
