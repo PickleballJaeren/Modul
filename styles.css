@@ -223,6 +223,8 @@ label{font-size:14px;color:var(--muted2);display:block;margin-bottom:4px}
 .rating-plass{font-family:'DM Mono',monospace;font-size:15px;color:var(--muted);width:20px;flex-shrink:0}
 .rating-navn{flex:1;font-size:15px;font-weight:500;min-width:0}
 .rating-verdi{font-family:'DM Mono',monospace;font-size:17px;font-weight:700}
+.rating-slett-btn{flex-shrink:0;background:none;border:none;color:var(--muted2);font-size:15px;padding:4px 2px;cursor:pointer;line-height:1;opacity:.55}
+.rating-slett-btn:active{opacity:1;color:var(--red)}
 
 /* ── Tekstfarge for inaktive ratingfaner, matcher kategorifargene ── */
 .kat-tekst-allround{color:var(--white)}

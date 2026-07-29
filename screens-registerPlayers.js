@@ -2,11 +2,12 @@
 // registerPlayers.js — Registrer deltakere-skjermen
 // ════════════════════════════════════════════════════════
 
+import { db, SAM, doc, setDoc, serverTimestamp } from './firebase.js';
 import { escHtml, naviger, visMelding } from './ui.js';
 import {
   erDeltaker, veksleDeltaker, hentOkt, settStartBaner,
   hentRatingService, hentSpillerKart, leggTilLokalt, navnFor,
-  lagreAktivOktTilSky,
+  lagreAktivOktTilSky, hentAktivKlubbId,
 } from './state.js';
 import { KONKURRANSE_NAVN } from './domain-constants.js';
 import { visAktivOkt } from './screens-activeSession.js';
@@ -68,6 +69,21 @@ export function leggTilManuellSpiller() {
   veksleDeltaker(id);
   input.value = '';
   tegnListe();
+
+  // Skriv til players-samlingen med det samme (ikke bare i minnet) --
+  // uten dette forsvinner navnet så snart appen lastes på nytt, og
+  // spilleren vises som rå ID på ratinglister, i arkivet osv. hos alle
+  // (inkl. admin selv neste gang). Fire-and-forget: navnet er allerede
+  // vist lokalt, ikke la nettverket blokkere det videre.
+  setDoc(doc(db, SAM.SPILLERE, id), {
+    navn,
+    klubbId: hentAktivKlubbId(),
+    manuell: true,
+    opprettet: serverTimestamp(),
+  }).catch(e => {
+    console.error('[registerPlayers] Kunne ikke lagre manuelt tillagt spiller:', e);
+    visMelding('Kunne ikke lagre spilleren permanent (ingen nett?)', 'advarsel');
+  });
 }
 window.leggTilManuellSpiller = leggTilManuellSpiller;
 
