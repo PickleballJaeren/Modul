@@ -9,7 +9,7 @@ import {
   registrerPinGetter, registrerKlubbIdGetter,
   krevAdmin as krevAdminBase,
   getErAdmin, setErAdmin, gjenopprettAdminStatus, nullstillAdmin,
-  pinInput, bekreftPin, lukkPinModal,
+  pinInput, bekreftPin, lukkPinModal, registrerAdminStatusHook,
 } from './admin.js';
 
 import { lagRatingService } from './domain-rating-ratingService.js';
@@ -25,7 +25,7 @@ import {
 import { KONKURRANSE_NAVN } from './domain-constants.js';
 
 import { visKonkurranser, IKON } from './screens-competitions.js';
-import { visRatinglister } from './screens-ratingLists.js';
+import { visRatinglister, oppdaterAdminSynlighetRatingliste } from './screens-ratingLists.js';
 import { visArkiv } from './screens-archive.js';
 // registerPlayers.js kobler seg selv til window.* og importeres
 // transitivt via competitions.js. activeSession.js og registerFinish.js
@@ -93,8 +93,67 @@ function oppdaterKlubbUI() {
   if (demoInfo) demoInfo.style.display = klubb?.demo ? 'block' : 'none';
   const klubbHandlinger = document.getElementById('hjem-klubb-handlinger');
   if (klubbHandlinger) klubbHandlinger.style.display = aktivKlubbId ? 'flex' : 'none';
+  oppdaterAdminUI();
 }
 window.getErAdmin = getErAdmin;
+
+// ════════════════════════════════════════════════════════
+// ADMIN-LÅS — ett globalt lås-ikon (se index.html), synlig så snart en
+// klubb er valgt. Eksisterer FORDI admin-forbeholdte knapper nå er
+// skjult i stedet for bare PIN-gatet på trykk (se oppdaterAdminUI()) --
+// uten dette ville en admin som ikke har lukket opp ennå på denne
+// enheten aldri hatt noe å trykke på for å komme i gang.
+// ════════════════════════════════════════════════════════
+window.apneAdminLas = function () {
+  if (!aktivKlubbId) {
+    visMelding('Velg klubb først', 'advarsel');
+    return;
+  }
+  if (getErAdmin()) {
+    if (confirm('Låse admin-tilgangen på denne enheten igjen?')) {
+      nullstillAdmin();
+      visMelding('Admin låst');
+    }
+    return;
+  }
+  krevAdminMedDemo('Lås opp admin', 'Skriv inn PIN for å vise admin-handlinger.', () => {
+    setErAdmin(true); // no-op om allerede satt via ekte PIN -- fanger demo-bypass-veien, som ellers ikke setter den
+    visMelding('Admin låst opp');
+  });
+};
+
+/**
+ * Kalles hver gang admin-status faktisk endrer seg (registrert som hook
+ * i admin.js), OG hver gang klubb byttes -- oppdaterer lås-ikonet,
+ * hjemskjermens admin-knapper, og gjenoppbygger hvilken som helst av de
+ * andre skjermene som selv viser/skjuler admin-elementer, dersom den
+ * skjermen er den som faktisk vises akkurat nå.
+ */
+function oppdaterAdminUI() {
+  const erAdmin = getErAdmin();
+
+  const lasBtn = document.getElementById('admin-las-btn');
+  if (lasBtn) lasBtn.style.display = aktivKlubbId ? 'flex' : 'none';
+  const lasIkon = document.getElementById('admin-las-ikon');
+  if (lasIkon) lasIkon.textContent = erAdmin ? '🔓' : '🔒';
+
+  const startKnapp = document.getElementById('hjem-start-okt-btn');
+  if (startKnapp) startKnapp.style.display = (aktivKlubbId && erAdmin) ? 'block' : 'none';
+  const delWrapper = document.getElementById('hjem-del-appen-wrapper');
+  if (delWrapper) delWrapper.style.display = (aktivKlubbId && erAdmin) ? 'block' : 'none';
+  if (!erAdmin) {
+    const delBoks = document.getElementById('del-appen-boks');
+    if (delBoks) delBoks.style.display = 'none';
+    const adminBoks = document.getElementById('admin-seksjon-boks');
+    if (adminBoks) adminBoks.style.display = 'none';
+  }
+
+  // Gjenoppbygg admin-avhengige deler av skjermen som faktisk vises nå.
+  if (document.getElementById('skjerm-aktiv-okt')?.classList.contains('active')) oppdaterAktivOktVisning();
+  if (document.getElementById('skjerm-registrer-sluttbane')?.classList.contains('active')) oppdaterSluttbaneVisning();
+  if (document.getElementById('skjerm-ratinglister')?.classList.contains('active')) oppdaterAdminSynlighetRatingliste();
+}
+registrerAdminStatusHook(oppdaterAdminUI);
 
 // ════════════════════════════════════════════════════════
 // DEL APPEN — QR-kode + kopier lenke

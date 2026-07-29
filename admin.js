@@ -39,15 +39,26 @@ let _erAdmin      = false; // initialiseres av gjenopprettAdminStatus() etter kl
 
 const PIN_MAKS_FORSOK = 5;
 
+// Kalles hver gang admin-status FAKTISK endrer seg (av/på), slik at
+// app.js kan vise/skjule admin-forbeholdte knapper med det samme --
+// uten denne ville et vellykket PIN-oppslag krevd en ny navigering før
+// admin-knappene dukket opp (se registrerAdminStatusHook()/oppdaterAdminUI() i app.js).
+let _adminStatusHook = () => {};
+export function registrerAdminStatusHook(fn) { _adminStatusHook = fn; }
+
 export function getErAdmin() { return _erAdmin; }
 export function setErAdmin(v) {
+  const endret = v !== _erAdmin;
   _erAdmin = v;
   if (v) localStorage.setItem(_adminNøkkel(), '1');
   else   localStorage.removeItem(_adminNøkkel());
+  if (endret) _adminStatusHook(_erAdmin);
 }
 export function nullstillAdmin() {
+  const endret = _erAdmin !== false;
   _erAdmin = false;
   localStorage.removeItem(_adminNøkkel());
+  if (endret) _adminStatusHook(false);
 }
 
 /** Kalles av app.js etter at klubbId er satt — gjenoppretter admin-status fra localStorage. */

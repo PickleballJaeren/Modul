@@ -78,6 +78,8 @@ input[type="text"]:focus,input[type="number"]:focus,select:focus{outline:none;bo
 label{font-size:14px;color:var(--muted2);display:block;margin-bottom:4px}
 
 /* ── Toast / bannere ── */
+.admin-las-knapp{position:fixed;top:14px;right:14px;z-index:400;width:38px;height:38px;border-radius:50%;background:var(--navy2);border:1px solid var(--border2);color:inherit;font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.85}
+.admin-las-knapp:active{opacity:1}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(12px);background:rgba(22,163,74,.95);color:#fff;padding:11px 22px;border-radius:10px;font-size:17px;font-weight:600;opacity:0;transition:all .25s;z-index:999;white-space:nowrap;pointer-events:none;max-width:90vw;text-align:center}
 .toast.vis{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.feil{background:rgba(220,38,38,.95)}

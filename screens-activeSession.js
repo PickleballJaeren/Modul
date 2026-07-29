@@ -6,6 +6,7 @@
 
 import { escHtml, naviger, visMelding } from './ui.js';
 import { hentOkt, nullstillOkt, lagreAktivOktTilSky, slettAktivOktFraSky, hentSpillerKart } from './state.js';
+import { getErAdmin } from './admin.js';
 import { KONKURRANSE_NAVN } from './domain-constants.js';
 import { hentSpillerNavn } from './screens-registerPlayers.js';
 import { visRegistrerSluttbane } from './screens-registerFinish.js';
@@ -41,6 +42,10 @@ export async function oppdaterAktivOktVisning() {
 function tegnAktivOkt() {
   const okt = hentOkt();
   const container = document.getElementById('aktiv-okt-innhold');
+  const handlingerHtml = getErAdmin() ? `
+    <button class="knapp knapp-primaer" style="margin-top:12px" onclick="window.avsluttOkt()">Avslutt økt</button>
+    <button class="knapp knapp-fare knapp-liten" style="width:100%;margin-top:10px" onclick="window.avbrytOkt()">Avbryt økt</button>
+  ` : '';
   container.innerHTML = `
     ${okt.startBaner.map(bane => `
       <div class="bane-rad">
@@ -50,8 +55,7 @@ function tegnAktivOkt() {
         </div>
       </div>
     `).join('')}
-    <button class="knapp knapp-primaer" style="margin-top:12px" onclick="window.avsluttOkt()">Avslutt økt</button>
-    <button class="knapp knapp-fare knapp-liten" style="width:100%;margin-top:10px" onclick="window.avbrytOkt()">Avbryt økt</button>
+    ${handlingerHtml}
   `;
 }
 

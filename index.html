@@ -19,6 +19,13 @@
   <span id="firebase-feil-tekst"></span>
 </div>
 
+<!-- ── ADMIN-LÅS — globalt, synlig på alle skjermer så snart en klubb er
+     valgt. Eneste måte å låse opp admin-forbeholdte knapper på, siden
+     disse nå er skjult i stedet for bare PIN-gatet på trykk. ── -->
+<button id="admin-las-btn" class="admin-las-knapp" style="display:none" onclick="window.apneAdminLas?.()" title="Admin" aria-label="Admin">
+  <span id="admin-las-ikon">🔒</span>
+</button>
+
 <!-- ── HJEM ── -->
 <div id="skjerm-hjem" class="screen active">
   <div class="scroll-omrade">
@@ -50,7 +57,7 @@
         </div>
         <span class="kat-tag kat-soft_play" id="pagaende-okt-badge" style="background:rgba(34,197,94,.15);color:var(--green2);flex-shrink:0">Aktiv</span>
       </div>
-      <button class="knapp knapp-primaer" style="width:100%" onclick="window.startNyOkt?.()">
+      <button class="knapp knapp-primaer" id="hjem-start-okt-btn" style="width:100%;display:none" onclick="window.startNyOkt?.()">
         Start ny økt
       </button>
       <div style="display:flex;gap:10px">
@@ -59,13 +66,12 @@
       </div>
     </div>
 
-    <div style="text-align:center;margin-top:26px">
+    <div id="hjem-del-appen-wrapper" style="display:none;text-align:center;margin-top:26px">
       <button type="button" onclick="window.visDelAppenSeksjon?.()"
               style="display:inline-flex;align-items:center;gap:8px;background:var(--navy2);border:1px solid var(--border2);
                      border-radius:999px;padding:11px 24px;color:inherit;font:inherit;font-size:15px;font-weight:600;cursor:pointer">
         <span style="font-size:17px">🔗</span> Del appen
       </button>
-      <div style="font-size:12px;color:var(--muted2);margin-top:6px">Krever admin</div>
     </div>
     <div class="sl-regel-boks" id="del-appen-boks" style="display:none;text-align:center;padding:20px 16px;margin-top:12px">
       <div id="hjem-qr" style="display:inline-block;background:#fff;padding:10px;border-radius:14px;line-height:0"></div>
@@ -183,13 +189,12 @@
       <div id="sammenlign-rader"></div>
     </div>
 
-    <div style="text-align:center;margin-top:22px">
+    <div id="ratinglister-admin-wrapper" style="display:none;text-align:center;margin-top:22px">
       <button type="button" onclick="window.visAdminSeksjon?.()"
               style="display:inline-flex;align-items:center;gap:8px;background:var(--navy2);border:1px solid var(--border2);
                      border-radius:999px;padding:11px 24px;color:inherit;font:inherit;font-size:15px;font-weight:600;cursor:pointer">
         <span style="font-size:17px">⚠️</span> Administrasjon
       </button>
-      <div style="font-size:12px;color:var(--muted2);margin-top:6px">Krever admin</div>
     </div>
     <div class="sl-regel-boks" id="admin-seksjon-boks" style="display:none;margin-top:12px">
       <div style="font-size:14px;margin-bottom:14px">

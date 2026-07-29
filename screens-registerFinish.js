@@ -13,6 +13,7 @@ import {
   lagreAktivOktTilSky, fullforAktivOktISky, hentSpillerKart,
 } from './state.js';
 import { finnStartBane } from './domain-rating-courtAssignment.js';
+import { getErAdmin } from './admin.js';
 import { KONKURRANSE_NAVN } from './domain-constants.js';
 import { hentSpillerNavn } from './screens-registerPlayers.js';
 import { visOktResultat } from './screens-oktResultat.js';
@@ -58,6 +59,7 @@ function tegn() {
   const okt = hentOkt();
   const container = document.getElementById('sluttbane-innhold');
   const sluttbaner = beregnSluttbaner(); // spillerId -> baneNr, kun for plasserte
+  const erAdmin = getErAdmin();
 
   document.getElementById('sluttbane-teller').textContent =
     `${okt.plasseringer.length} av ${okt.deltakerIder.length}`;
@@ -71,10 +73,16 @@ function tegn() {
   const raderHtml = okt.deltakerIder.map(id => {
     const erPlassert = okt.plasseringer.includes(id);
     if (!erPlassert) {
-      return `
+      // For ikke-admin (skrivebeskyttet visning) fjernes klikk-mulighet
+      // og "+"-ikonet helt -- raden blir en ren, ikke-interaktiv rad.
+      return erAdmin ? `
         <div class="sl-spillervelger-rad" onclick="window.plasserSpillerNeste('${id}')">
           <span>${escHtml(hentSpillerNavn(id))}</span>
           <span style="color:var(--muted2);font-size:16px">+</span>
+        </div>
+      ` : `
+        <div class="sl-spillervelger-rad" style="cursor:default">
+          <span>${escHtml(hentSpillerNavn(id))}</span>
         </div>
       `;
     }
@@ -88,6 +96,15 @@ function tegn() {
       </div>
     `;
   }).join('');
+
+  if (!erAdmin) {
+    container.innerHTML = `
+      <div class="sl-spillervelger-treff" style="max-height:none">
+        ${raderHtml}
+      </div>
+    `;
+    return;
+  }
 
   const fullforHtml = erFerdigPlassert()
     ? `<button class="knapp knapp-primaer" style="margin-top:16px" onclick="window.fullforOktRegistrering()">Fullfør økt</button>`

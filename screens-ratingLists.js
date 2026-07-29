@@ -8,6 +8,7 @@ import { db, SAM, collection, query, where, orderBy, limit, getDocs, doc, getDoc
 import { lagBatchHjelper } from './batch-helpers.js';
 import { escHtml, naviger, visMelding } from './ui.js';
 import { hentSpillerKart, hentRatingService } from './state.js';
+import { getErAdmin } from './admin.js';
 import { ALLE_KATEGORIER, ALLE_KONKURRANSER, RATINGKATEGORI_NAVN, STARTRATING, KONKURRANSE_NAVN } from './domain-constants.js';
 
 const KATEGORI_IKON = { soft_play: '🎯', power_play: '⚡', defense: '🛡️', singles: '🙋', allround: '🏆' };
@@ -43,9 +44,27 @@ let aktivFane = 'allround';
 
 export async function visRatinglister() {
   naviger('ratinglister');
+  oppdaterAdminSynlighetRatingliste(); // knapper + rader (radene tegnes på nytt like under)
   await hentSpillerKart();
   tegnFaner();
   await tegnListe();
+}
+
+/**
+ * Vis/skjul Administrasjon-knappen basert på admin-status, og tegn
+ * radlisten på nytt (rediger-rating og slett-spiller-knappene per rad
+ * avgjøres også der, se tegnListe()). Kalles ved åpning av skjermen OG
+ * hver gang admin-status endrer seg mens skjermen allerede vises (se
+ * oppdaterAdminUI() i app.js).
+ */
+export function oppdaterAdminSynlighetRatingliste() {
+  const wrapper = document.getElementById('ratinglister-admin-wrapper');
+  if (wrapper) wrapper.style.display = getErAdmin() ? 'block' : 'none';
+  if (!getErAdmin()) {
+    const boks = document.getElementById('admin-seksjon-boks');
+    if (boks) boks.style.display = 'none';
+  }
+  if (document.getElementById('rating-liste-innhold')) tegnListe();
 }
 
 function tegnFaner() {
@@ -100,12 +119,13 @@ async function tegnListe() {
     return;
   }
 
+  const erAdmin = getErAdmin();
   listeContainer.innerHTML = rader.map((r, i) => `
     <div class="rating-rad">
       <span class="rating-plass">${i + 1}</span>
       <span class="rating-navn" style="cursor:pointer" onclick="window.apneSpillerprofil('${r.spillerId}')">${escHtml(spillerKart.get(r.spillerId) ?? r.spillerId)}</span>
-      <span class="rating-verdi"${aktivFane === 'allround' ? '' : ` style="cursor:pointer" onclick="window.redigerRating('${r.spillerId}','${aktivFane}',${r.verdi})" title="Trykk for å redigere"`}>${r.verdi}</span>
-      <button class="rating-slett-btn" onclick="window.slettSpillerBekreft('${r.spillerId}')" title="Slett spiller" aria-label="Slett spiller">🗑</button>
+      <span class="rating-verdi"${erAdmin && aktivFane !== 'allround' ? ` style="cursor:pointer" onclick="window.redigerRating('${r.spillerId}','${aktivFane}',${r.verdi})" title="Trykk for å redigere"` : ''}>${r.verdi}</span>
+      ${erAdmin ? `<button class="rating-slett-btn" onclick="window.slettSpillerBekreft('${r.spillerId}')" title="Slett spiller" aria-label="Slett spiller">🗑</button>` : ''}
     </div>
   `).join('');
 }
