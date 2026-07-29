@@ -57,6 +57,29 @@ export function settStartBaner(baner) {
   if (okt) okt.startBaner = baner;
 }
 
+/**
+ * Bytter baneplassering mellom to spillere -- for manuell overstyring av
+ * det automatisk genererte baneoppsettet (se veksleRedigeringsmodus() i
+ * screens-activeSession.js). Ingen effekt om noen av spillerne ikke
+ * finnes i startBaner, eller om de er samme spiller.
+ */
+export function byttSpillerePaBane(spillerIdA, spillerIdB) {
+  if (!okt?.startBaner || spillerIdA === spillerIdB) return;
+  const finnPosisjon = id => {
+    for (const bane of okt.startBaner) {
+      const i = bane.spillerIder.indexOf(id);
+      if (i !== -1) return { bane, i };
+    }
+    return null;
+  };
+  const posA = finnPosisjon(spillerIdA);
+  const posB = finnPosisjon(spillerIdB);
+  if (!posA || !posB) return;
+  const temp = posA.bane.spillerIder[posA.i];
+  posA.bane.spillerIder[posA.i] = posB.bane.spillerIder[posB.i];
+  posB.bane.spillerIder[posB.i] = temp;
+}
+
 export function plasserSpiller(spillerId) {
   if (!okt || okt.plasseringer.includes(spillerId)) return;
   okt.plasseringer.push(spillerId);

@@ -5,7 +5,10 @@
 // ════════════════════════════════════════════════════════
 
 import { escHtml, naviger, visMelding } from './ui.js';
-import { hentOkt, nullstillOkt, lagreAktivOktTilSky, slettAktivOktFraSky, hentSpillerKart } from './state.js';
+import {
+  hentOkt, nullstillOkt, lagreAktivOktTilSky, slettAktivOktFraSky, hentSpillerKart,
+  byttSpillerePaBane,
+} from './state.js';
 import { getErAdmin } from './admin.js';
 import { KONKURRANSE_NAVN } from './domain-constants.js';
 import { hentSpillerNavn } from './screens-registerPlayers.js';
@@ -15,6 +18,9 @@ import { apneSlettBekreft } from './screens-ratingLists.js';
 export async function visAktivOkt() {
   const okt = hentOkt();
   if (!okt?.startBaner) { naviger('hjem'); return; }
+
+  redigeringsModus = false;
+  valgtSpillerId = null;
 
   // Sikrer spillernavn selv om vi kom hit direkte via "Pågående økt"-
   // kortet på hjemskjermen, uten å ha vært innom deltaker-skjermen der
@@ -39,25 +45,78 @@ export async function oppdaterAktivOktVisning() {
   tegnAktivOkt();
 }
 
+// ── Manuell redigering av baneoppsett ──────────────────────
+// Av og på-bryter, admin-only. I redigeringsmodus blir hvert spillernavn
+// klikkbart: trykk én spiller, så en annen, for å bytte dem mellom
+// banene sine. Rekkefølgen innad på en bane har ingen betydning for
+// rating-beregningen (se pairwiseAverageElo.js), så selve BYTTET er kun
+// et spørsmål om hvem som havner sammen -- ikke om plassering på banen.
+let redigeringsModus = false;
+let valgtSpillerId = null;
+
 function tegnAktivOkt() {
   const okt = hentOkt();
   const container = document.getElementById('aktiv-okt-innhold');
-  const handlingerHtml = getErAdmin() ? `
+  const erAdmin = getErAdmin();
+
+  const banerHtml = okt.startBaner.map(bane => `
+    <div class="bane-rad">
+      <span class="bane-nr">${String(bane.baneNr).padStart(2, '0')}</span>
+      <div style="flex:1;min-width:0">
+        ${bane.spillerIder.map(id => {
+          const erKlikkbar = erAdmin && redigeringsModus;
+          const erValgt = redigeringsModus && valgtSpillerId === id;
+          return `<div class="bane-navn${erValgt ? ' bane-navn-valgt' : ''}"${erKlikkbar ? ` style="cursor:pointer" onclick="window.velgSpillerForBytte('${id}')"` : ''}>${escHtml(hentSpillerNavn(id))}</div>`;
+        }).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  const redigerKnappHtml = erAdmin ? `
+    <button class="knapp knapp-omriss" style="width:100%;margin-top:12px" onclick="window.veksleRedigeringsmodus()">
+      ${redigeringsModus ? 'Ferdig med baneoppsett' : '✏️ Rediger baneoppsett'}
+    </button>
+  ` : '';
+
+  // Skjuler Avslutt/Avbryt mens redigering pågår, for å unngå
+  // utilsiktede trykk midt i en pågående bytte-handling.
+  const handlingerHtml = (erAdmin && !redigeringsModus) ? `
     <button class="knapp knapp-primaer" style="margin-top:12px" onclick="window.avsluttOkt()">Avslutt økt</button>
     <button class="knapp knapp-fare knapp-liten" style="width:100%;margin-top:10px" onclick="window.avbrytOkt()">Avbryt økt</button>
   ` : '';
+
   container.innerHTML = `
-    ${okt.startBaner.map(bane => `
-      <div class="bane-rad">
-        <span class="bane-nr">${String(bane.baneNr).padStart(2, '0')}</span>
-        <div style="flex:1;min-width:0">
-          ${bane.spillerIder.map(id => `<div class="bane-navn">${escHtml(hentSpillerNavn(id))}</div>`).join('')}
-        </div>
-      </div>
-    `).join('')}
+    ${redigeringsModus ? '<div class="tom-tilstand-liten" style="margin-bottom:10px">Trykk to spillere for å bytte dem</div>' : ''}
+    ${banerHtml}
+    ${redigerKnappHtml}
     ${handlingerHtml}
   `;
 }
+
+export function veksleRedigeringsmodus() {
+  redigeringsModus = !redigeringsModus;
+  valgtSpillerId = null;
+  tegnAktivOkt();
+}
+window.veksleRedigeringsmodus = veksleRedigeringsmodus;
+
+export function velgSpillerForBytte(spillerId) {
+  if (!valgtSpillerId) {
+    valgtSpillerId = spillerId;
+    tegnAktivOkt();
+    return;
+  }
+  if (valgtSpillerId === spillerId) {
+    valgtSpillerId = null; // trykket samme spiller igjen -- avbryt valget
+    tegnAktivOkt();
+    return;
+  }
+  byttSpillerePaBane(valgtSpillerId, spillerId);
+  valgtSpillerId = null;
+  tegnAktivOkt();
+  lagreAktivOktTilSky().catch(e => console.error('[activeSession] Kunne ikke synkronisere baneendring:', e));
+}
+window.velgSpillerForBytte = velgSpillerForBytte;
 
 export function avsluttOkt() {
   // PIN-gatet fordi skjermen nå også kan nås av andre enn den som startet

@@ -89,7 +89,7 @@ label{font-size:14px;color:var(--muted2);display:block;margin-bottom:4px}
 
 /* ── Modal ── */
 .modal-bakgrunn{position:fixed;inset:0;background:rgba(3,9,18,.88);z-index:500;display:flex;align-items:flex-end;justify-content:center}
-.modal{background:var(--navy2);border:1px solid var(--border2);border-radius:22px 22px 0 0;padding:24px 20px calc(36px + var(--safe-bottom));width:100%;max-width:480px}
+.modal{background:var(--navy2);border:1px solid var(--border2);border-radius:22px 22px 0 0;padding:24px 20px calc(36px + var(--safe-bottom));width:100%;max-width:480px;max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .modal-tittel{font-family:'Bebas Neue',cursive;font-size:26px;letter-spacing:1px;margin-bottom:8px}
 .modal-tekst{font-size:15px;color:var(--muted2);margin-bottom:18px;line-height:1.5}
 .pin-rad{display:flex;gap:10px;justify-content:center;margin-bottom:14px}
@@ -201,6 +201,8 @@ label{font-size:14px;color:var(--muted2);display:block;margin-bottom:4px}
 .bane-nr{font-family:'DM Mono',monospace;font-size:14px;color:var(--muted);flex-shrink:0;width:22px}
 .bane-navn{font-size:16px;line-height:1.5}
 .bane-navn-sekundaer{font-size:16px;color:var(--muted2);line-height:1.5}
+.bane-navn-valgt{color:var(--accent2);font-weight:700;position:relative;padding-left:16px}
+.bane-navn-valgt::before{content:"›";position:absolute;left:0;color:var(--accent2)}
 .bane-bytt-ikon{color:var(--muted);cursor:pointer;flex-shrink:0}
 
 /* ── Bevegelsesmerke ved sluttbane-registrering ── */
