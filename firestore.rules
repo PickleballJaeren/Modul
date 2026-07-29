@@ -90,5 +90,11 @@ service cloud.firestore {
       allow read: if true;
       allow write: if true;
     }
+    // Aktiv, pågående økt -- én per klubb, delt i sanntid slik at admin
+    // kan gjenoppta etter omstart og andre kan følge økten skrivebeskyttet.
+    match /activeSessions/{klubbId} {
+      allow read: if true;
+      allow write: if true;
+    }
   }
 }

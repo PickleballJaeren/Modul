@@ -6,7 +6,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import {
   getFirestore, collection, doc, addDoc, updateDoc, setDoc,
-  getDoc, getDocs, query, where, orderBy, limit,
+  getDoc, getDocs, deleteDoc, query, where, orderBy, limit,
   onSnapshot, serverTimestamp, writeBatch, runTransaction,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
@@ -39,6 +39,7 @@ export const SAM = {
   PLAYER_COMPETITION_PROGRESS: 'playerCompetitionProgress', // id: {spillerId}_{konkurranse}
   PLAYER_ALLROUND:             'playerAllround',            // id: {spillerId}
   SESSIONS:                    'sessions',                  // = arkivet
+  AKTIV_OKT:                   'activeSessions',            // id: {klubbId} -- pågående, delt økt
 };
 
 // ════════════════════════════════════════════════════════
@@ -56,6 +57,6 @@ export { db };
 
 export {
   collection, doc, addDoc, updateDoc, setDoc,
-  getDoc, getDocs, query, where, orderBy, limit,
+  getDoc, getDocs, deleteDoc, query, where, orderBy, limit,
   onSnapshot, serverTimestamp, writeBatch, runTransaction,
 };

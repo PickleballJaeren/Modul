@@ -6,6 +6,7 @@ import { escHtml, naviger, visMelding } from './ui.js';
 import {
   erDeltaker, veksleDeltaker, hentOkt, settStartBaner,
   hentRatingService, hentSpillerKart, leggTilLokalt, navnFor,
+  lagreAktivOktTilSky,
 } from './state.js';
 import { KONKURRANSE_NAVN } from './domain-constants.js';
 import { visAktivOkt } from './screens-activeSession.js';
@@ -37,7 +38,7 @@ function tegnListe() {
     return `
     <div class="sl-spillervelger-rad${valgt ? ' valgt' : ''}" onclick="window.veksleSpillerValgt('${id}')">
       <span>${escHtml(navn)}</span>
-      ${valgt ? '<span style="font-size:15px">✓</span>' : '<span style="color:var(--muted2);font-size:16px">+</span>'}
+      ${valgt ? '' : '<span style="color:var(--muted2);font-size:16px">+</span>'}
     </div>
   `;
   }).join('');
@@ -80,6 +81,13 @@ export async function startOktFraDeltakere() {
   const baner = await ratingService.genererBaner(okt.konkurranse, okt.deltakerIder);
   settStartBaner(baner);
   visAktivOkt();
+
+  // Del økten med andre enheter og sørg for at den overlever en
+  // app-omstart -- ikke vent på dette før vi navigerer videre.
+  lagreAktivOktTilSky().catch(e => {
+    console.error('[registerPlayers] Kunne ikke dele økten med andre enheter:', e);
+    visMelding('Kunne ikke dele økten med andre enheter (ingen nett?)', 'advarsel');
+  });
 }
 window.startOktFraDeltakere = startOktFraDeltakere;
 

@@ -10,6 +10,7 @@ import { escHtml, naviger, visMelding } from './ui.js';
 import {
   hentOkt, plasserSpiller, angreSisteePlassering, erFerdigPlassert,
   beregnSluttbaner, nullstillOkt, hentRatingService,
+  lagreAktivOktTilSky, slettAktivOktFraSky,
 } from './state.js';
 import { finnStartBane } from './domain-rating-courtAssignment.js';
 import { KONKURRANSE_NAVN } from './domain-constants.js';
@@ -22,6 +23,17 @@ export function visRegistrerSluttbane() {
 
   document.getElementById('sluttbane-tittel').textContent = KONKURRANSE_NAVN[okt.konkurranse];
   naviger('registrer-sluttbane');
+  tegn();
+}
+
+/**
+ * Tegner kun innholdet uten å navigere/scrolle -- brukes ved sanntids-
+ * oppdatering mens skjermen allerede vises (f.eks. noen som følger
+ * resultatregistreringen live på en annen enhet).
+ */
+export function oppdaterSluttbaneVisning() {
+  const okt = hentOkt();
+  if (!okt?.startBaner) return;
   tegn();
 }
 
@@ -83,22 +95,38 @@ function tegn() {
       ${raderHtml}
     </div>
     ${fullforHtml}
+    <button class="knapp knapp-fare knapp-liten" style="width:100%;margin-top:16px" onclick="window.avbrytOkt()">Avbryt økt</button>
   `;
 }
 
 export function plasserSpillerNeste(spillerId) {
-  plasserSpiller(spillerId);
-  tegn();
+  // PIN-gatet: skjermen kan nå nås av andre enn admin (via "Pågående
+  // økt"-kortet på hjemskjermen), så registrering må fortsatt kreve PIN.
+  window.krevAdmin('Registrer plassering', 'Bekreft med PIN for å registrere resultater.', () => {
+    plasserSpiller(spillerId);
+    tegn();
+    lagreAktivOktTilSky().catch(e => console.error('[registerFinish] Kunne ikke synkronisere:', e));
+  });
 }
 window.plasserSpillerNeste = plasserSpillerNeste;
 
 export function angreSisteSluttbane() {
-  angreSisteePlassering();
-  tegn();
+  window.krevAdmin('Angre', 'Bekreft med PIN for å angre siste registrering.', () => {
+    angreSisteePlassering();
+    tegn();
+    lagreAktivOktTilSky().catch(e => console.error('[registerFinish] Kunne ikke synkronisere:', e));
+  });
 }
 window.angreSisteSluttbane = angreSisteSluttbane;
 
-export async function fullforOktRegistrering() {
+export function fullforOktRegistrering() {
+  window.krevAdmin('Fullfør økt', 'Bekreft med PIN for å lagre resultatet.', () => {
+    utforFullforing();
+  });
+}
+window.fullforOktRegistrering = fullforOktRegistrering;
+
+async function utforFullforing() {
   const okt = hentOkt();
   const ratingService = hentRatingService();
   const sluttbaner = beregnSluttbaner();
@@ -112,6 +140,10 @@ export async function fullforOktRegistrering() {
   try {
     const resultat = await ratingService.beregnOktResultat(okt.konkurranse, okt.startBaner, sluttbaner);
     await ratingService.fullforOkt(resultat);
+    // Fjern den delte "aktiv økt"-dokumentet -- den ligger nå i arkivet.
+    // Fire-and-forget: et eventuelt opprydningsproblem her skal ikke
+    // vises som en feil når selve resultatet faktisk ble lagret.
+    slettAktivOktFraSky().catch(e => console.error('[registerFinish] Kunne ikke fjerne aktiv økt fra skyen:', e));
     visMelding('Økt fullført og lagret i arkivet');
     nullstillOkt();
     visOktResultat(resultat);
@@ -121,4 +153,3 @@ export async function fullforOktRegistrering() {
     tegn(); // gjenopprett skjermen slik at admin kan prøve på nytt
   }
 }
-window.fullforOktRegistrering = fullforOktRegistrering;

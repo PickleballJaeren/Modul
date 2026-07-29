@@ -18,16 +18,21 @@ import * as provisionalPolicy from './domain-rating-provisionalPolicy.js';
 import * as baneStrategi from './domain-rating-courtAssignment.js';
 import * as allroundKalkulator from './domain-rating-allroundCalculator.js';
 import { lagFirestoreRatingRepository } from './domain-repository-firestoreRatingRepository.js';
-import { settRatingService, settAktivKlubbId } from './state.js';
+import {
+  settRatingService, settAktivKlubbId,
+  lyttPaaAktivOkt, stoppAktivOktLytting, gjenopprettOktLokalt,
+} from './state.js';
+import { KONKURRANSE_NAVN } from './domain-constants.js';
 
-import { visKonkurranser } from './screens-competitions.js';
+import { visKonkurranser, IKON } from './screens-competitions.js';
 import { visRatinglister } from './screens-ratingLists.js';
 import { visArkiv } from './screens-archive.js';
-// registerPlayers.js, activeSession.js og registerFinish.js
-// kobler seg selv til window.* og importeres transitivt via competitions.js
+// registerPlayers.js kobler seg selv til window.* og importeres
+// transitivt via competitions.js. activeSession.js og registerFinish.js
+// trenger navngitte imports her for gjenoppta-/live-oppdateringslogikken.
 import './screens-registerPlayers.js';
-import './screens-activeSession.js';
-import './screens-registerFinish.js';
+import { visAktivOkt, oppdaterAktivOktVisning } from './screens-activeSession.js';
+import { visRegistrerSluttbane, oppdaterSluttbaneVisning } from './screens-registerFinish.js';
 
 window.pinInput    = pinInput;
 window.bekreftPin  = bekreftPin;
@@ -58,6 +63,8 @@ window.byttKlubb = function (klubbId) {
   if (!klubbId || !KLUBBER[klubbId]) {
     aktivKlubbId = null;
     settAktivKlubbId(null);
+    stoppAktivOktLytting();
+    oppdaterPagaendeOktUI(null);
     oppdaterKlubbUI();
     return;
   }
@@ -73,6 +80,7 @@ window.byttKlubb = function (klubbId) {
   if (!erAdminFraForrige) setErAdmin(KLUBBER[klubbId].demo);
 
   oppdaterKlubbUI();
+  lyttPaaAktivOkt(klubbId, haandterAktivOktEndring);
   visMelding('Klubb valgt: ' + KLUBBER[klubbId].navn);
 };
 
@@ -131,6 +139,64 @@ window.visDelAppenSeksjon = function () {
 // Eksponerer klubbnavn for andre moduler (f.eks. ratingLists.js sin
 // Administrasjon-seksjon), slik at KLUBBER-oppslaget forblir samlet her.
 window.hentAktivKlubbNavn = function () { return getAktivKlubb()?.navn ?? null; };
+
+// ════════════════════════════════════════════════════════
+// PÅGÅENDE ØKT — vises på hjemskjermen for ALLE med appen åpen på
+// klubben (admin eller ikke), basert på sanntidslytting fra
+// lyttPaaAktivOkt() (state.js). Gir tre ting:
+//  1) Admin kan lukke/gjenåpne appen uten at en påbegynt økt forsvinner.
+//  2) Andre (delt via QR/lenke) ser at en økt pågår, og kan følge den
+//     -- inkl. sluttresultatet -- helt skrivebeskyttet frem til de
+//     ev. oppgir PIN (selve skrive-handlingene er PIN-gatet der de
+//     utføres, se screens-activeSession.js / screens-registerFinish.js).
+//  3) Om noen allerede STÅR på aktiv-økt/sluttbane-skjermen når
+//     dataene endrer seg et annet sted, oppdateres visningen live.
+// ════════════════════════════════════════════════════════
+let sisteAktivOktData = null;
+
+function oppdaterPagaendeOktUI(data) {
+  sisteAktivOktData = data;
+  const kort = document.getElementById('hjem-pagaende-okt');
+  if (!kort) return;
+  if (!data) { kort.style.display = 'none'; return; }
+
+  kort.style.display = 'flex';
+  document.getElementById('pagaende-okt-ikon').textContent = IKON[data.konkurranse] ?? '🏓';
+  document.getElementById('pagaende-okt-navn').textContent = KONKURRANSE_NAVN[data.konkurranse] ?? data.konkurranse;
+  const antall = data.plasseringer?.length ?? 0;
+  const totalt = data.deltakerIder?.length ?? 0;
+  document.getElementById('pagaende-okt-sub').textContent = antall > 0
+    ? `${antall} av ${totalt} plassert`
+    : `${totalt} spillere · baner satt opp`;
+}
+
+function haandterAktivOktEndring(data) {
+  oppdaterPagaendeOktUI(data);
+
+  // Om noen akkurat nå står og ser på en av de to live-skjermene, hold
+  // visningen oppdatert -- uten å navigere/scrolle (se
+  // oppdaterAktivOktVisning()/oppdaterSluttbaneVisning()).
+  const paAktivOktSkjerm = document.getElementById('skjerm-aktiv-okt')?.classList.contains('active');
+  const paSluttbaneSkjerm = document.getElementById('skjerm-registrer-sluttbane')?.classList.contains('active');
+  if (!paAktivOktSkjerm && !paSluttbaneSkjerm) return;
+
+  if (data) {
+    gjenopprettOktLokalt(data);
+    if (paSluttbaneSkjerm) oppdaterSluttbaneVisning();
+    else oppdaterAktivOktVisning();
+  } else {
+    // Økten forsvant (fullført eller avbrutt et annet sted) mens noen sto og så på den.
+    naviger('hjem');
+    visMelding('Økten er ikke lenger aktiv');
+  }
+}
+
+window.apnePagaendeOkt = function () {
+  if (!sisteAktivOktData) return;
+  gjenopprettOktLokalt(sisteAktivOktData);
+  if ((sisteAktivOktData.plasseringer?.length ?? 0) > 0) visRegistrerSluttbane();
+  else visAktivOkt();
+};
 
 // ════════════════════════════════════════════════════════
 // HJEMSKJERM-HANDLINGER
