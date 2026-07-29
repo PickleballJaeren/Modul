@@ -10,16 +10,21 @@ import { escHtml, naviger, visMelding } from './ui.js';
 import {
   hentOkt, plasserSpiller, angreSisteePlassering, erFerdigPlassert,
   beregnSluttbaner, nullstillOkt, hentRatingService,
-  lagreAktivOktTilSky, slettAktivOktFraSky,
+  lagreAktivOktTilSky, slettAktivOktFraSky, hentSpillerKart,
 } from './state.js';
 import { finnStartBane } from './domain-rating-courtAssignment.js';
 import { KONKURRANSE_NAVN } from './domain-constants.js';
 import { hentSpillerNavn } from './screens-registerPlayers.js';
 import { visOktResultat } from './screens-oktResultat.js';
 
-export function visRegistrerSluttbane() {
+export async function visRegistrerSluttbane() {
   const okt = hentOkt();
   if (!okt?.startBaner) { naviger('hjem'); return; }
+
+  // Sikrer spillernavn selv om vi kom hit direkte via "Pågående økt"-
+  // kortet, uten å ha vært innom deltaker-skjermen der navnecachen
+  // normalt fylles.
+  await hentSpillerKart();
 
   document.getElementById('sluttbane-tittel').textContent = KONKURRANSE_NAVN[okt.konkurranse];
   naviger('registrer-sluttbane');
@@ -31,9 +36,10 @@ export function visRegistrerSluttbane() {
  * oppdatering mens skjermen allerede vises (f.eks. noen som følger
  * resultatregistreringen live på en annen enhet).
  */
-export function oppdaterSluttbaneVisning() {
+export async function oppdaterSluttbaneVisning() {
   const okt = hentOkt();
   if (!okt?.startBaner) return;
+  await hentSpillerKart();
   tegn();
 }
 

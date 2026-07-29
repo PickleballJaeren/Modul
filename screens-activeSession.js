@@ -5,15 +5,21 @@
 // ════════════════════════════════════════════════════════
 
 import { escHtml, naviger, visMelding } from './ui.js';
-import { hentOkt, nullstillOkt, lagreAktivOktTilSky, slettAktivOktFraSky } from './state.js';
+import { hentOkt, nullstillOkt, lagreAktivOktTilSky, slettAktivOktFraSky, hentSpillerKart } from './state.js';
 import { KONKURRANSE_NAVN } from './domain-constants.js';
 import { hentSpillerNavn } from './screens-registerPlayers.js';
 import { visRegistrerSluttbane } from './screens-registerFinish.js';
 import { apneSlettBekreft } from './screens-ratingLists.js';
 
-export function visAktivOkt() {
+export async function visAktivOkt() {
   const okt = hentOkt();
   if (!okt?.startBaner) { naviger('hjem'); return; }
+
+  // Sikrer spillernavn selv om vi kom hit direkte via "Pågående økt"-
+  // kortet på hjemskjermen, uten å ha vært innom deltaker-skjermen der
+  // navnecachen normalt fylles (hentSpillerKart() er selv cachet, så
+  // dette er billig/øyeblikkelig for admin sin vanlige flyt).
+  await hentSpillerKart();
 
   document.getElementById('aktiv-okt-tittel').textContent = KONKURRANSE_NAVN[okt.konkurranse];
   naviger('aktiv-okt');
@@ -25,9 +31,10 @@ export function visAktivOkt() {
  * oppdatering mens skjermen allerede vises (f.eks. hos noen som følger
  * økten på en annen enhet, se haandterAktivOktEndring() i app.js).
  */
-export function oppdaterAktivOktVisning() {
+export async function oppdaterAktivOktVisning() {
   const okt = hentOkt();
   if (!okt?.startBaner) return;
+  await hentSpillerKart();
   tegnAktivOkt();
 }
 
