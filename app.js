@@ -33,6 +33,7 @@ import { visArkiv } from './screens-archive.js';
 import './screens-registerPlayers.js';
 import { visAktivOkt, oppdaterAktivOktVisning } from './screens-activeSession.js';
 import { visRegistrerSluttbane, oppdaterSluttbaneVisning } from './screens-registerFinish.js';
+import { visOktResultat } from './screens-oktResultat.js';
 
 window.pinInput    = pinInput;
 window.bekreftPin  = bekreftPin;
@@ -143,14 +144,17 @@ window.hentAktivKlubbNavn = function () { return getAktivKlubb()?.navn ?? null; 
 // ════════════════════════════════════════════════════════
 // PÅGÅENDE ØKT — vises på hjemskjermen for ALLE med appen åpen på
 // klubben (admin eller ikke), basert på sanntidslytting fra
-// lyttPaaAktivOkt() (state.js). Gir tre ting:
+// lyttPaaAktivOkt() (state.js). Gir fire ting:
 //  1) Admin kan lukke/gjenåpne appen uten at en påbegynt økt forsvinner.
 //  2) Andre (delt via QR/lenke) ser at en økt pågår, og kan følge den
-//     -- inkl. sluttresultatet -- helt skrivebeskyttet frem til de
-//     ev. oppgir PIN (selve skrive-handlingene er PIN-gatet der de
-//     utføres, se screens-activeSession.js / screens-registerFinish.js).
+//     helt skrivebeskyttet frem til de ev. oppgir PIN (selve skrive-
+//     handlingene er PIN-gatet der de utføres, se screens-activeSession.js
+//     / screens-registerFinish.js).
 //  3) Om noen allerede STÅR på aktiv-økt/sluttbane-skjermen når
 //     dataene endrer seg et annet sted, oppdateres visningen live.
+//  4) Når admin trykker "Fullfør økt", får alle som fulgte den live
+//     automatisk se resultatskjermen også (status: 'fullfort', se
+//     fullforAktivOktISky() i state.js) -- ikke bare admin selv.
 // ════════════════════════════════════════════════════════
 let sisteAktivOktData = null;
 
@@ -163,21 +167,38 @@ function oppdaterPagaendeOktUI(data) {
   kort.style.display = 'flex';
   document.getElementById('pagaende-okt-ikon').textContent = IKON[data.konkurranse] ?? '🏓';
   document.getElementById('pagaende-okt-navn').textContent = KONKURRANSE_NAVN[data.konkurranse] ?? data.konkurranse;
-  const antall = data.plasseringer?.length ?? 0;
-  const totalt = data.deltakerIder?.length ?? 0;
-  document.getElementById('pagaende-okt-sub').textContent = antall > 0
-    ? `${antall} av ${totalt} plassert`
-    : `${totalt} spillere · baner satt opp`;
+
+  const badge = document.getElementById('pagaende-okt-badge');
+  if (data.status === 'fullfort') {
+    document.getElementById('pagaende-okt-sub').textContent = 'Resultat klart';
+    if (badge) badge.textContent = 'Ferdig';
+  } else {
+    const antall = data.plasseringer?.length ?? 0;
+    const totalt = data.deltakerIder?.length ?? 0;
+    document.getElementById('pagaende-okt-sub').textContent = antall > 0
+      ? `${antall} av ${totalt} plassert`
+      : `${totalt} spillere · baner satt opp`;
+    if (badge) badge.textContent = 'Aktiv';
+  }
 }
 
 function haandterAktivOktEndring(data) {
   oppdaterPagaendeOktUI(data);
 
+  const paAktivOktSkjerm = document.getElementById('skjerm-aktiv-okt')?.classList.contains('active');
+  const paSluttbaneSkjerm = document.getElementById('skjerm-registrer-sluttbane')?.classList.contains('active');
+
+  if (data?.status === 'fullfort') {
+    // Noen fullførte økten -- vis resultatet automatisk for alle som
+    // aktivt fulgte den (baneliste/sluttbane), uten å forstyrre noen
+    // som er et annet sted i appen (f.eks. arkiv eller ratinglister).
+    if (paAktivOktSkjerm || paSluttbaneSkjerm) visOktResultat(data.resultat);
+    return;
+  }
+
   // Om noen akkurat nå står og ser på en av de to live-skjermene, hold
   // visningen oppdatert -- uten å navigere/scrolle (se
   // oppdaterAktivOktVisning()/oppdaterSluttbaneVisning()).
-  const paAktivOktSkjerm = document.getElementById('skjerm-aktiv-okt')?.classList.contains('active');
-  const paSluttbaneSkjerm = document.getElementById('skjerm-registrer-sluttbane')?.classList.contains('active');
   if (!paAktivOktSkjerm && !paSluttbaneSkjerm) return;
 
   if (data) {
@@ -185,7 +206,8 @@ function haandterAktivOktEndring(data) {
     if (paSluttbaneSkjerm) oppdaterSluttbaneVisning();
     else oppdaterAktivOktVisning();
   } else {
-    // Økten forsvant (fullført eller avbrutt et annet sted) mens noen sto og så på den.
+    // Økten forsvant (avbrutt et annet sted, eller resultatskjermen ble
+    // lukket av noen andre) mens noen sto og fulgte den live.
     naviger('hjem');
     visMelding('Økten er ikke lenger aktiv');
   }
@@ -193,6 +215,10 @@ function haandterAktivOktEndring(data) {
 
 window.apnePagaendeOkt = function () {
   if (!sisteAktivOktData) return;
+  if (sisteAktivOktData.status === 'fullfort') {
+    visOktResultat(sisteAktivOktData.resultat);
+    return;
+  }
   gjenopprettOktLokalt(sisteAktivOktData);
   if ((sisteAktivOktData.plasseringer?.length ?? 0) > 0) visRegistrerSluttbane();
   else visAktivOkt();

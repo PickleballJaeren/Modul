@@ -1,18 +1,27 @@
 // ════════════════════════════════════════════════════════
 // oktResultat.js — Øktresultat-skjermen
 //
-// Vises rett etter "Fullfør økt" i registerFinish.js. Rent visnings-
-// lag -- tar imot resultatet fra ratingService.beregnOktResultat()
-// (samme objekt som allerede er lagret via fullforOkt()) og tegner
-// det opp. Ingen egen henting fra Firestore her.
+// Vises rett etter "Fullfør økt" i registerFinish.js -- MEN kan også
+// vises hos tilskuere (skjermer som følger en delt økt live, se
+// haandterAktivOktEndring() i app.js) idet admin fullfører den, eller
+// ved å trykke "Pågående økt"-kortet etter at den er fullført. Tar
+// imot resultatet direkte (samme objekt som ratingService.
+// beregnOktResultat() returnerer, ev. hentet fra Firestore for en
+// tilskuer) og tegner det opp -- ingen egen resultatberegning her.
 // ════════════════════════════════════════════════════════
 
 import { escHtml, naviger } from './ui.js';
 import { KONKURRANSE_NAVN } from './domain-constants.js';
 import { hentSpillerNavn } from './screens-registerPlayers.js';
 import { bevegelseBadge } from './screens-registerFinish.js';
+import { hentSpillerKart, slettAktivOktFraSky } from './state.js';
 
-export function visOktResultat(resultat) {
+export async function visOktResultat(resultat) {
+  // Sikrer spillernavn selv om vi kom hit som tilskuer uten å ha vært
+  // innom deltaker-skjermen der navnecachen normalt fylles (billig/
+  // øyeblikkelig når den allerede er lastet, som for admin sin vanlige flyt).
+  await hentSpillerKart();
+
   document.getElementById('okt-resultat-tittel').textContent = KONKURRANSE_NAVN[resultat.konkurranse] ?? resultat.konkurranse;
   naviger('okt-resultat');
 
@@ -38,6 +47,19 @@ export function visOktResultat(resultat) {
 
   container.innerHTML = `
     <div class="kort">${raderHtml}</div>
-    <button class="knapp knapp-primaer" style="width:100%;margin-top:16px" onclick="naviger('hjem')">Ferdig</button>
+    <button class="knapp knapp-primaer" style="width:100%;margin-top:16px" onclick="window.lukkOktResultat()">Ferdig</button>
   `;
 }
+
+/**
+ * Lukker resultatskjermen og rydder bort den delte "aktiv økt"-
+ * dokumentet i skyen (som frem til nå har inneholdt det fullførte
+ * resultatet, se fullforAktivOktISky() i state.js) -- slik at
+ * "Pågående økt"-kortet forsvinner for alle, ikke bare hos den som
+ * trykker. Trygt å kalle flere ganger / fra flere enheter.
+ */
+export function lukkOktResultat() {
+  slettAktivOktFraSky().catch(e => console.error('[oktResultat] Kunne ikke rydde bort delt økt:', e));
+  naviger('hjem');
+}
+window.lukkOktResultat = lukkOktResultat;

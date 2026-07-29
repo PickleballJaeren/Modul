@@ -10,7 +10,7 @@ import { escHtml, naviger, visMelding } from './ui.js';
 import {
   hentOkt, plasserSpiller, angreSisteePlassering, erFerdigPlassert,
   beregnSluttbaner, nullstillOkt, hentRatingService,
-  lagreAktivOktTilSky, slettAktivOktFraSky, hentSpillerKart,
+  lagreAktivOktTilSky, fullforAktivOktISky, hentSpillerKart,
 } from './state.js';
 import { finnStartBane } from './domain-rating-courtAssignment.js';
 import { KONKURRANSE_NAVN } from './domain-constants.js';
@@ -146,10 +146,12 @@ async function utforFullforing() {
   try {
     const resultat = await ratingService.beregnOktResultat(okt.konkurranse, okt.startBaner, sluttbaner);
     await ratingService.fullforOkt(resultat);
-    // Fjern den delte "aktiv økt"-dokumentet -- den ligger nå i arkivet.
-    // Fire-and-forget: et eventuelt opprydningsproblem her skal ikke
-    // vises som en feil når selve resultatet faktisk ble lagret.
-    slettAktivOktFraSky().catch(e => console.error('[registerFinish] Kunne ikke fjerne aktiv økt fra skyen:', e));
+    // Marker økten som fullført MED resultatet i skyen (i stedet for å
+    // slette den) -- slik at andre som følger den ser resultatskjermen
+    // også, se app.js sin haandterAktivOktEndring(). Fire-and-forget:
+    // et eventuelt synk-problem her skal ikke vises som en feil når
+    // selve resultatet faktisk ble lagret.
+    fullforAktivOktISky(resultat).catch(e => console.error('[registerFinish] Kunne ikke dele resultatet:', e));
     visMelding('Økt fullført og lagret i arkivet');
     nullstillOkt();
     visOktResultat(resultat);

@@ -152,6 +152,7 @@ export async function lagreAktivOktTilSky() {
   const ref = aktivOktRef();
   if (!ref || !okt?.startBaner) return;
   await setDoc(ref, {
+    status: 'aktiv',
     konkurranse: okt.konkurranse,
     deltakerIder: okt.deltakerIder,
     startBaner: okt.startBaner,
@@ -160,7 +161,28 @@ export async function lagreAktivOktTilSky() {
   });
 }
 
-/** Fjerner den delte økten -- kalles når den fullføres eller avbrytes. */
+/**
+ * Markerer den delte økten som fullført, MED resultatet vedlagt, i stedet
+ * for å slette den med det samme -- slik at andre som følger økten (via
+ * "Pågående økt"-kortet, se app.js) også får se resultatskjermen når
+ * admin trykker "Fullfør økt". Overskriver dokumentet fullstendig, så
+ * de gamle feltene (deltakerIder, startBaner osv.) forsvinner naturlig.
+ * Selve slettingen skjer først når noen trykker "Ferdig" på
+ * resultatskjermen, se lukkOktResultat() i screens-oktResultat.js.
+ */
+export async function fullforAktivOktISky(resultat) {
+  const ref = aktivOktRef();
+  if (!ref) return;
+  await setDoc(ref, {
+    status: 'fullfort',
+    konkurranse: resultat.konkurranse,
+    resultat,
+    oppdatert: serverTimestamp(),
+  });
+}
+
+/** Fjerner den delte økten -- kalles ved avbrytelse, eller når noen
+ * lukker resultatskjermen etter en fullført økt. */
 export async function slettAktivOktFraSky() {
   const ref = aktivOktRef();
   if (!ref) return;
