@@ -4,12 +4,13 @@
 // (se firestoreRatingRepository.js) -- ingen egen arkiv-samling.
 // ════════════════════════════════════════════════════════
 
-import { db, SAM, collection, query, orderBy, limit, getDocs } from './firebase.js';
+import { db, SAM, collection, query, orderBy, getDocs } from './firebase.js';
 import { escHtml, naviger } from './ui.js';
 import { hentSpillerKart } from './state.js';
 import { KONKURRANSE_NAVN } from './domain-constants.js';
 import { IKON } from './screens-competitions.js';
 import { bevegelseBadge } from './screens-registerFinish.js';
+import { hentKlubbSpillerIder } from './screens-ratingLists.js';
 
 // oktId -> rå Firestore-data, satt ved visArkiv(). Brukes av
 // visOktDetaljer() slik at vi slipper å hente økten på nytt ved klikk.
@@ -26,16 +27,27 @@ export async function visArkiv() {
   container.innerHTML = '<div class="laster"><span class="laster-snurr"></span>Henter arkiv…</div>';
 
   try {
-    const q = query(collection(db, SAM.SESSIONS), orderBy('dato', 'desc'), limit(50));
+    // VIKTIG: sessions har ingen klubbId-felt (se ARKITEKTUR.md-
+    // datamodellen), så spørringen returnerer økter fra ALLE klubber.
+    // Filtrerer på klientsiden mot klubbens kjente spiller-IDer -- samme
+    // mønster som brukes for administrasjons-slettingen (og nå også
+    // ratinglisten, se hentKlubbSpillerIder() i screens-ratingLists.js).
+    // Uten dette ville andre klubbers økter vist seg her.
+    const klubbSpillerIder = await hentKlubbSpillerIder();
+    const q = query(collection(db, SAM.SESSIONS), orderBy('dato', 'desc'));
     const snap = await getDocs(q);
     oktKart.clear();
 
-    if (snap.empty) {
+    const klubbOkter = snap.docs
+      .filter(d => (d.data().resultatPerSpiller ?? []).some(r => klubbSpillerIder.has(r.spillerId)))
+      .slice(0, 50);
+
+    if (klubbOkter.length === 0) {
       container.innerHTML = '<div class="tom-tilstand">Ingen økter registrert ennå</div>';
       return;
     }
 
-    container.innerHTML = snap.docs.map(d => {
+    container.innerHTML = klubbOkter.map(d => {
       const okt = d.data();
       oktKart.set(d.id, okt);
       const antall = okt.resultatPerSpiller?.length ?? 0;

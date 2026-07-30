@@ -90,23 +90,40 @@ window.byttRatingFane = byttRatingFane;
 
 async function tegnListe() {
   const listeContainer = document.getElementById('rating-liste-innhold');
-  const spillerKart = await hentSpillerKart();
+  const spillerKart = await hentSpillerKart(); // Map<spillerId, navn>, avgrenset til aktiv klubb
 
+  // VIKTIG: playerCategoryRatings/playerAllround har ingen klubbId-felt
+  // (se ARKITEKTUR.md-datamodellen), så spørringen mot Firestore
+  // returnerer ratinger for ALLE klubber. Uten client-side-filtrering
+  // her ville andre klubbers spillere (og dermed også andre klubbers
+  // manuelt tillagte spillere, uten oppløsbart navn) vist seg i listen.
+  // Samme mønster som hentKlubbSpillerIder()/slettAllRatingForKlubb()
+  // lenger ned i filen bruker for administrasjons-slettingen.
+  //
+  // limit(50) er derfor droppet fra selve spørringen -- vi må hente
+  // bredt nok til at klubbens egne topp-50 ikke kuttes bort FØR
+  // filtreringen, og tar i stedet topp 50 ETTER at andre klubber er
+  // filtrert bort.
   let rader;
   try {
     if (aktivFane === 'allround') {
-      const q = query(collection(db, SAM.PLAYER_ALLROUND), orderBy('allround', 'desc'), limit(50));
+      const q = query(collection(db, SAM.PLAYER_ALLROUND), orderBy('allround', 'desc'));
       const snap = await getDocs(q);
-      rader = snap.docs.map(d => ({ spillerId: d.data().spillerId, verdi: d.data().allround }));
+      rader = snap.docs
+        .map(d => ({ spillerId: d.data().spillerId, verdi: d.data().allround }))
+        .filter(r => spillerKart.has(r.spillerId))
+        .slice(0, 50);
     } else {
       const q = query(
         collection(db, SAM.PLAYER_CATEGORY_RATINGS),
         where('kategori', '==', aktivFane),
         orderBy('elo', 'desc'),
-        limit(50),
       );
       const snap = await getDocs(q);
-      rader = snap.docs.map(d => ({ spillerId: d.data().spillerId, verdi: d.data().elo }));
+      rader = snap.docs
+        .map(d => ({ spillerId: d.data().spillerId, verdi: d.data().elo }))
+        .filter(r => spillerKart.has(r.spillerId))
+        .slice(0, 50);
     }
   } catch (e) {
     console.error('[ratingLists] Kunne ikke hente liste:', e);
@@ -517,14 +534,18 @@ document.addEventListener('sl-naviger', e => {
 
 // ════════════════════════════════════════════════════════
 // ADMINISTRASJON — slett all rating / arkiv for aktiv klubb
+// ════════════════════════════════════════════════════════
+// KLUBB-AVGRENSNING — delt hjelper, brukt av både visningen (tegnListe()
+// over) og administrasjons-slettingen under.
 //
 // Ratinger og økter lagres ikke med klubbId direkte i Firestore (se
 // ARKITEKTUR.md-datamodellen); avgrensningen til "aktiv klubb" skjer
 // derfor ved å slå opp hvilke spillerIder som tilhører klubben (samme
 // players-oppslag som resten av appen bruker), og kun slette/behandle
-// dokumenter som gjelder disse spillerIdene.
+// dokumenter som gjelder disse spillerIdene. Eksportert slik at
+// screens-archive.js kan filtrere arkivet på samme måte.
 // ════════════════════════════════════════════════════════
-async function hentKlubbSpillerIder() {
+export async function hentKlubbSpillerIder() {
   const kart = await hentSpillerKart(); // Map<spillerId, navn>, filtrert på aktiv klubb
   return new Set(kart.keys());
 }
