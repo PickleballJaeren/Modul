@@ -139,8 +139,11 @@ function oppdaterAdminUI() {
 
   const startKnapp = document.getElementById('hjem-start-okt-btn');
   if (startKnapp) startKnapp.style.display = (aktivKlubbId && erAdmin) ? 'block' : 'none';
+  // Del appen (QR/lenke) skjules i tillegg alltid for demo-klubben, selv
+  // om den automatisk regnes som "admin" -- demo skal ikke kunne dele
+  // videre, siden hvem som helst kan velge demo uten PIN.
   const delWrapper = document.getElementById('hjem-del-appen-wrapper');
-  if (delWrapper) delWrapper.style.display = (aktivKlubbId && erAdmin) ? 'block' : 'none';
+  if (delWrapper) delWrapper.style.display = (aktivKlubbId && erAdmin && !getAktivKlubb()?.demo) ? 'block' : 'none';
   if (!erAdmin) {
     const delBoks = document.getElementById('del-appen-boks');
     if (delBoks) delBoks.style.display = 'none';
@@ -187,6 +190,10 @@ window.kopierAppLenke = async function () {
 window.visDelAppenSeksjon = function () {
   if (!aktivKlubbId) {
     visMelding('Velg klubb først for å dele appen', 'advarsel');
+    return;
+  }
+  if (getAktivKlubb()?.demo) {
+    visMelding('Demo-klubben kan ikke dele appen videre', 'advarsel');
     return;
   }
   krevAdminMedDemo('Del appen', 'Kun admin kan vise QR-koden og lenken til appen.', () => {
