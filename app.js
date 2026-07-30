@@ -177,11 +177,43 @@ function renderHjemQR() {
   }
 }
 
+// live.html er en helt egen, selvstendig side (se live.js) -- egen
+// lenke per klubb, ingen PIN, kun skrivebeskyttet baneliste/resultat.
+function liveLenkeUrl() {
+  return new URL(`live.html?klubb=${encodeURIComponent(aktivKlubbId)}`, location.href).href;
+}
+
+function renderLiveQR() {
+  const container = document.getElementById('hjem-live-qr');
+  if (!container || typeof qrcode === 'undefined' || !aktivKlubbId) return;
+  try {
+    const qr = qrcode(0, 'M');
+    qr.addData(liveLenkeUrl());
+    qr.make();
+    container.innerHTML = qr.createSvgTag({ cellSize: 5, margin: 4, scalable: true });
+    const svg = container.querySelector('svg');
+    if (svg) { svg.style.width = '160px'; svg.style.height = '160px'; svg.style.display = 'block'; }
+  } catch (e) {
+    console.warn('[QR] Kunne ikke generere live-QR:', e?.message);
+  }
+}
+
 window.kopierAppLenke = async function () {
   const url = location.origin + location.pathname;
   try {
     await navigator.clipboard.writeText(url);
     visMelding('Lenke kopiert!');
+  } catch (e) {
+    prompt('Kopier lenken manuelt:', url);
+  }
+};
+
+window.kopierLiveLenke = async function () {
+  if (!aktivKlubbId) return;
+  const url = liveLenkeUrl();
+  try {
+    await navigator.clipboard.writeText(url);
+    visMelding('Lenke til live baneliste kopiert!');
   } catch (e) {
     prompt('Kopier lenken manuelt:', url);
   }
@@ -200,6 +232,7 @@ window.visDelAppenSeksjon = function () {
     const boks = document.getElementById('del-appen-boks');
     if (boks) boks.style.display = 'block';
     renderHjemQR();
+    renderLiveQR();
   });
 };
 

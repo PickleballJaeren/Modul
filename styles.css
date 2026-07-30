@@ -59,6 +59,22 @@ html,body{height:100%;background:var(--navy);color:var(--white);font-family:'DM 
 .tom-tilstand{padding:60px 20px;text-align:center;color:var(--muted2);font-size:16px;line-height:1.5}
 .tom-tilstand-liten{padding:24px 16px;text-align:center;color:var(--muted2);font-size:15px}
 
+/* ── Live-baneliste-siden (live.html) — egen, enkel side delt via lenke ── */
+.live-wrap{max-width:480px;margin:0 auto;padding:20px 16px calc(20px + var(--safe-bottom))}
+.live-innhold{min-height:60vh}
+.live-header{text-align:center;margin-bottom:22px}
+.live-klubb{font-size:12px;text-transform:uppercase;letter-spacing:2px;color:var(--muted2);margin-bottom:6px}
+.live-tittel{font-family:'Bebas Neue',cursive;font-size:26px;letter-spacing:1px}
+.live-badge{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;padding:6px 14px;border-radius:999px;margin-top:10px}
+.live-badge-aktiv{background:rgba(34,197,94,.15);color:var(--green2)}
+.live-badge-ferdig{background:rgba(37,99,235,.15);color:var(--accent2)}
+.live-prikk{width:7px;height:7px;border-radius:50%;background:var(--green2)}
+.live-prikk-lite{width:6px;height:6px}
+.live-fotnote{display:flex;align-items:center;justify-content:center;gap:7px;color:var(--muted2);font-size:12px;margin-top:20px}
+.live-status{padding:70px 20px;text-align:center}
+.live-status-ikon{font-size:38px;margin-bottom:14px}
+.live-status-tekst{color:var(--muted2);font-size:16px;line-height:1.5}
+
 /* ── Knapper ── */
 .knapp{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:16px;border-radius:14px;border:none;cursor:pointer;font-family:'Bebas Neue',cursive;font-size:24px;letter-spacing:2px;transition:transform .1s,opacity .15s;-webkit-tap-highlight-color:transparent}
 .knapp:active{transform:scale(.97)}
