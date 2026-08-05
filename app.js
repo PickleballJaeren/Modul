@@ -34,6 +34,10 @@ import './screens-registerPlayers.js';
 import { visAktivOkt, oppdaterAktivOktVisning } from './screens-activeSession.js';
 import { visRegistrerSluttbane, oppdaterSluttbaneVisning } from './screens-registerFinish.js';
 import { visOktResultat } from './screens-oktResultat.js';
+// screens-skillTests.js kobler seg selv til window.* og pakker inn
+// window.apneSpillerprofil (se filen) -- MÅ importeres etter
+// screens-ratingLists.js, som er importert lenger opp i denne filen.
+import './screens-skillTests.js';
 
 window.pinInput    = pinInput;
 window.bekreftPin  = bekreftPin;

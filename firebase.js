@@ -40,6 +40,11 @@ export const SAM = {
   PLAYER_ALLROUND:             'playerAllround',            // id: {spillerId}
   SESSIONS:                    'sessions',                  // = arkivet
   AKTIV_OKT:                   'activeSessions',            // id: {klubbId} -- pågående, delt økt
+
+  // ── Ferdighetstester — egne samlinger, se domain-repository-firestoreTestRepository.js ──
+  SKILL_TEST_RESULTATER:       'skillTestResults',          // id: {testType}_{timestamp} -- arkiv
+  SKILL_TEST_TERSKLER:         'skillTestThresholds',       // id: {klubbId}_{testType}
+  PLAYER_SKILL_TESTS:          'playerSkillTests',          // id: {spillerId}_{testType} -- gjeldende + historikk
 };
 
 // ════════════════════════════════════════════════════════
