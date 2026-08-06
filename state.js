@@ -28,33 +28,62 @@ import {
 // omstart bare koster et par tastetrykk å gjenta. Selve rating-
 // skrivingen (elo, historikk osv.) skjer fortsatt kun i
 // ratingService.fullforOkt() ved slutt.
+//
+// ── sporListe (treningsspor) ──────────────────────────────────────
+// Intern lagring er ALLTID en liste av spor: { konkurranse,
+// deltakerIder, startBaner, plasseringer }[] -- selv en vanlig,
+// enkelt-spor-økt er internt en liste med ÉTT element. Alle
+// funksjonene under (veksleDeltaker, plasserSpiller, osv.) opererer
+// bevisst på "gjeldende spor" (index 0), UENDRET i signatur -- ingen av
+// skjermene (registerPlayers/activeSession/registerFinish/oktResultat)
+// vet noe om sporListe og trenger ikke endres for at dagens
+// enkelt-spor-flyt skal fungere identisk som før.
+//
+// hentOkt() "flater ut" spor 0 til toppnivå (samme felt som tidligere:
+// .konkurranse, .deltakerIder, .startBaner, .plasseringer), pluss et
+// nytt .sporListe-felt for fremtidig multi-spor-UI. Fremtidig kode kan
+// bygge videre med en valgfri sporIndeks-parameter uten å røre disse
+// filene igjen.
 
 let okt = null;
 
 export function startNyOkt(konkurranse) {
   okt = {
-    konkurranse,
-    deltakerIder: [],
-    startBaner: null,   // settes rett etter "Start økt" trykkes i registrer-deltakere
-    plasseringer: [],   // rekkefølge admin trykker spillere i ved sluttregistrering
+    sporListe: [{
+      konkurranse,
+      deltakerIder: [],
+      startBaner: null,   // settes rett etter "Start økt" trykkes i registrer-deltakere
+      plasseringer: [],   // rekkefølge admin trykker spillere i ved sluttregistrering
+    }],
   };
 }
 
-export function hentOkt() { return okt; }
+/** Internt: spor 0 -- det ENESTE sporet i dagens (og enn så lenge alltid) enkelt-spor-flyt. */
+function gjeldendeSpor() {
+  return okt?.sporListe?.[0] ?? null;
+}
+
+export function hentOkt() {
+  const spor = gjeldendeSpor();
+  if (!okt || !spor) return null;
+  return { ...spor, sporListe: okt.sporListe };
+}
 
 export function erDeltaker(spillerId) {
-  return !!okt?.deltakerIder.includes(spillerId);
+  return !!gjeldendeSpor()?.deltakerIder.includes(spillerId);
 }
 
 export function veksleDeltaker(spillerId) {
-  if (!okt) return;
-  const i = okt.deltakerIder.indexOf(spillerId);
-  if (i === -1) okt.deltakerIder.push(spillerId);
-  else okt.deltakerIder.splice(i, 1);
+  const spor = gjeldendeSpor();
+  if (!spor) return;
+  const i = spor.deltakerIder.indexOf(spillerId);
+  if (i === -1) spor.deltakerIder.push(spillerId);
+  else spor.deltakerIder.splice(i, 1);
 }
 
 export function settStartBaner(baner) {
-  if (okt) okt.startBaner = baner;
+  const spor = gjeldendeSpor();
+  if (spor) spor.startBaner = baner;
 }
 
 /**
@@ -64,9 +93,10 @@ export function settStartBaner(baner) {
  * finnes i startBaner, eller om de er samme spiller.
  */
 export function byttSpillerePaBane(spillerIdA, spillerIdB) {
-  if (!okt?.startBaner || spillerIdA === spillerIdB) return;
+  const spor = gjeldendeSpor();
+  if (!spor?.startBaner || spillerIdA === spillerIdB) return;
   const finnPosisjon = id => {
-    for (const bane of okt.startBaner) {
+    for (const bane of spor.startBaner) {
       const i = bane.spillerIder.indexOf(id);
       if (i !== -1) return { bane, i };
     }
@@ -81,22 +111,26 @@ export function byttSpillerePaBane(spillerIdA, spillerIdB) {
 }
 
 export function plasserSpiller(spillerId) {
-  if (!okt || okt.plasseringer.includes(spillerId)) return;
-  okt.plasseringer.push(spillerId);
+  const spor = gjeldendeSpor();
+  if (!spor || spor.plasseringer.includes(spillerId)) return;
+  spor.plasseringer.push(spillerId);
 }
 
 export function angreSisteePlassering() {
-  if (okt) okt.plasseringer.pop();
+  const spor = gjeldendeSpor();
+  if (spor) spor.plasseringer.pop();
 }
 
 export function erFerdigPlassert() {
-  return !!okt && okt.plasseringer.length === okt.deltakerIder.length;
+  const spor = gjeldendeSpor();
+  return !!spor && spor.plasseringer.length === spor.deltakerIder.length;
 }
 
 /** Regner ut sluttbane for hver plasserte spiller: to og to i trykkerekkefølge. */
 export function beregnSluttbaner() {
+  const spor = gjeldendeSpor();
   const map = new Map();
-  okt.plasseringer.forEach((id, indeks) => map.set(id, Math.floor(indeks / 2) + 1));
+  spor.plasseringer.forEach((id, indeks) => map.set(id, Math.floor(indeks / 2) + 1));
   return map;
 }
 
@@ -210,14 +244,12 @@ function byggSpillerNavnKart(spillerIder) {
 /** Skriver hele den lokale okt-tilstanden til Firestore. No-op uten klubb/baner. */
 export async function lagreAktivOktTilSky() {
   const ref = aktivOktRef();
-  if (!ref || !okt?.startBaner) return;
+  const spor = gjeldendeSpor();
+  if (!ref || !spor?.startBaner) return;
   await setDoc(ref, {
     status: 'aktiv',
-    konkurranse: okt.konkurranse,
-    deltakerIder: okt.deltakerIder,
-    startBaner: okt.startBaner,
-    plasseringer: okt.plasseringer,
-    spillerNavn: byggSpillerNavnKart(okt.deltakerIder),
+    sporListe: okt.sporListe,
+    spillerNavn: byggSpillerNavnKart(spor.deltakerIder),
     oppdatert: serverTimestamp(),
   });
 }
@@ -252,15 +284,36 @@ export async function slettAktivOktFraSky() {
   await deleteDoc(ref);
 }
 
-/** Setter den lokale okt-variabelen fra Firestore-data (gjenoppta/følg-med). */
+/**
+ * Setter den lokale okt-variabelen fra Firestore-data (gjenoppta/følg-med).
+ * Leser sporListe (nytt format). Faller tilbake til det gamle, flate
+ * formatet hvis et dokument skulle stå igjen i det formatet akkurat i
+ * overgangsøyeblikket rundt en deploy -- ren sikkerhetsnett, ikke noe
+ * som skal være i bruk under normal drift (se forsteSporData() under,
+ * som dekker samme tilfelle for rå Firestore-data i app.js/live.js).
+ */
 export function gjenopprettOktLokalt(data) {
   okt = {
-    konkurranse: data.konkurranse,
-    deltakerIder: data.deltakerIder ?? [],
-    startBaner: data.startBaner ?? null,
-    plasseringer: data.plasseringer ?? [],
+    sporListe: data.sporListe ?? [{
+      konkurranse: data.konkurranse,
+      deltakerIder: data.deltakerIder ?? [],
+      startBaner: data.startBaner ?? null,
+      plasseringer: data.plasseringer ?? [],
+    }],
   };
   flettInnSpillerNavn(data.spillerNavn);
+}
+
+/**
+ * Henter data for FØRSTE spor fra et rått activeSessions-dokument, til
+ * bruk FØR noe er gjenopprettet lokalt -- f.eks. "pågående økt"-kortet
+ * på hjemskjermen (app.js) og den frikoblede live-siden (live.js), som
+ * begge leser Firestore-data direkte uten å gå via hentOkt(). Samme
+ * fallback til gammelt format som gjenopprettOktLokalt().
+ */
+export function forsteSporData(data) {
+  if (!data) return null;
+  return data.sporListe?.[0] ?? data;
 }
 
 /**

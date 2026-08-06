@@ -55,6 +55,13 @@ function bevegelseBadge(startBaneNr, sluttBaneNr) {
   return `<span class="beveg-badge beveg-ned">▼${Math.abs(diff)}</span>`;
 }
 
+// Speiler forsteSporData() i state.js -- duplisert bevisst, samme grunn
+// som resten av filens dupliserte hjelpere (se toppkommentaren): denne
+// siden skal aldri dra med seg en avhengighet til state.js.
+function forsteSpor(data) {
+  return data?.sporListe?.[0] ?? data ?? {};
+}
+
 const params = new URLSearchParams(location.search);
 const klubbId = params.get('klubb');
 const klubbNavn = klubbId ? (KLUBB_NAVN[klubbId] ?? null) : null;
@@ -103,15 +110,16 @@ function tegnIngenAktiv() {
 }
 
 function tegnAktiv(data) {
-  const baner = data.startBaner ?? [];
-  const antallPlassert = data.plasseringer?.length ?? 0;
+  const spor = forsteSpor(data);
+  const baner = spor.startBaner ?? [];
+  const antallPlassert = spor.plasseringer?.length ?? 0;
   container.innerHTML = `
     <div class="live-header">
       <div class="live-klubb">${escHtml(klubbNavn)}</div>
-      <div class="live-tittel">${escHtml(IKON[data.konkurranse] ?? '🏓')} ${escHtml(KONKURRANSE_NAVN[data.konkurranse] ?? data.konkurranse)}</div>
+      <div class="live-tittel">${escHtml(IKON[spor.konkurranse] ?? '🏓')} ${escHtml(KONKURRANSE_NAVN[spor.konkurranse] ?? spor.konkurranse)}</div>
       <div class="live-badge live-badge-aktiv"><span class="live-prikk"></span> Aktiv nå</div>
     </div>
-    <div class="seksjon-etikett">Baneliste${antallPlassert ? ` · ${antallPlassert} av ${data.deltakerIder?.length ?? '?'} ferdig` : ''}</div>
+    <div class="seksjon-etikett">Baneliste${antallPlassert ? ` · ${antallPlassert} av ${spor.deltakerIder?.length ?? '?'} ferdig` : ''}</div>
     ${baner.map(bane => `
       <div class="bane-rad">
         <span class="bane-nr">${String(bane.baneNr).padStart(2, '0')}</span>

@@ -20,7 +20,7 @@ import * as allroundKalkulator from './domain-rating-allroundCalculator.js';
 import { lagFirestoreRatingRepository } from './domain-repository-firestoreRatingRepository.js';
 import {
   settRatingService, settAktivKlubbId,
-  lyttPaaAktivOkt, stoppAktivOktLytting, gjenopprettOktLokalt, flettInnSpillerNavn,
+  lyttPaaAktivOkt, stoppAktivOktLytting, gjenopprettOktLokalt, flettInnSpillerNavn, forsteSporData,
 } from './state.js';
 import { KONKURRANSE_NAVN } from './domain-constants.js';
 
@@ -271,16 +271,17 @@ function oppdaterPagaendeOktUI(data) {
   if (!data) { kort.style.display = 'none'; return; }
 
   kort.style.display = 'flex';
-  document.getElementById('pagaende-okt-ikon').textContent = IKON[data.konkurranse] ?? '🏓';
-  document.getElementById('pagaende-okt-navn').textContent = KONKURRANSE_NAVN[data.konkurranse] ?? data.konkurranse;
+  const spor = forsteSporData(data);
+  document.getElementById('pagaende-okt-ikon').textContent = IKON[spor.konkurranse] ?? '🏓';
+  document.getElementById('pagaende-okt-navn').textContent = KONKURRANSE_NAVN[spor.konkurranse] ?? spor.konkurranse;
 
   const badge = document.getElementById('pagaende-okt-badge');
   if (data.status === 'fullfort') {
     document.getElementById('pagaende-okt-sub').textContent = 'Resultat klart';
     if (badge) badge.textContent = 'Ferdig';
   } else {
-    const antall = data.plasseringer?.length ?? 0;
-    const totalt = data.deltakerIder?.length ?? 0;
+    const antall = spor.plasseringer?.length ?? 0;
+    const totalt = spor.deltakerIder?.length ?? 0;
     document.getElementById('pagaende-okt-sub').textContent = antall > 0
       ? `${antall} av ${totalt} plassert`
       : `${totalt} spillere · baner satt opp`;
@@ -330,7 +331,8 @@ window.apnePagaendeOkt = function () {
     return;
   }
   gjenopprettOktLokalt(sisteAktivOktData);
-  if ((sisteAktivOktData.plasseringer?.length ?? 0) > 0) visRegistrerSluttbane();
+  const spor = forsteSporData(sisteAktivOktData);
+  if ((spor.plasseringer?.length ?? 0) > 0) visRegistrerSluttbane();
   else visAktivOkt();
 };
 
