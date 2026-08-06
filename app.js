@@ -38,6 +38,12 @@ import { visOktResultat } from './screens-oktResultat.js';
 // window.apneSpillerprofil (se filen) -- MÅ importeres etter
 // screens-ratingLists.js, som er importert lenger opp i denne filen.
 import './screens-skillTests.js';
+// screens-minUtvikling.js pakker window.apneSpillerprofil inn EN GANG
+// TIL, for å legge Styrker/Potensial/Anbefalt aktivitet UNDER
+// ferdighetstester-seksjonen -- MÅ derfor importeres etter
+// screens-skillTests.js. Legger også til "Min utvikling"-knappen på
+// hjemskjermen.
+import './screens-minUtvikling.js';
 // screens-pamelding.js kobler seg selv til window.* og injiserer UI i
 // hjem-klubb-handlinger -- ingen rekkefølgekrav mot andre screens-import.
 import './screens-pamelding.js';

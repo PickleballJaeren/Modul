@@ -268,6 +268,28 @@ export function navnFor(spillerId) {
   return spillerKart?.get(spillerId) ?? ekstraSpillerNavn.get(spillerId) ?? spillerId;
 }
 
+// ── "Min spiller" — husket identitet ────────────────────
+// Lar en spiller slippe å velge seg selv på nytt hver gang -- brukt
+// både av "Hvem er du?" i påmelding (screens-pamelding.js) og av "Min
+// utvikling"-snarveien på hjemskjermen (screens-minUtvikling.js).
+// Skoped per klubb i localStorage, samme mønster som admin-PIN-
+// lagringen i admin.js (pb_admin_{klubbId}) -- et klubbytte på samme
+// enhet skal aldri kunne forhåndsutfylle feil spiller.
+function minSpillerNokkel(klubbId) {
+  return `pb_min_spiller_${klubbId}`;
+}
+
+export function hentMinSpillerId() {
+  if (!aktivKlubbId) return '';
+  return localStorage.getItem(minSpillerNokkel(aktivKlubbId)) || '';
+}
+
+export function settMinSpillerId(spillerId) {
+  if (!aktivKlubbId) return;
+  if (spillerId) localStorage.setItem(minSpillerNokkel(aktivKlubbId), spillerId);
+  else localStorage.removeItem(minSpillerNokkel(aktivKlubbId));
+}
+
 /**
  * Fletter inn spillernavn mottatt fra en delt økt (activeSessions) i
  * overlay-cachen -- dekker manuelt tillagte spillere, som en tilskuer

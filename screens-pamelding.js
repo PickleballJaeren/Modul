@@ -14,7 +14,7 @@
 // ════════════════════════════════════════════════════════
 
 import { escHtml, visMelding } from './ui.js';
-import { hentSpillerKart, hentAktivKlubbId } from './state.js';
+import { hentSpillerKart, hentAktivKlubbId, hentMinSpillerId, settMinSpillerId } from './state.js';
 import { getErAdmin } from './admin.js';
 import { lagFirestorePameldingRepository } from './domain-repository-firestorePameldingRepository.js';
 import { ALLE_KONKURRANSER, KONKURRANSE_NAVN } from './domain-constants.js';
@@ -161,26 +161,6 @@ window.lukkAdminPamelding = function () {
 
 let valgtSpor = null;
 
-// ════════════════════════════════════════════════════════
-// HUSKET SPILLER — lagrer siste "Hvem er du?"-valg per klubb i
-// localStorage, slik at spilleren slipper å velge seg selv på nytt hver
-// gang en ny påmeldingsrunde åpnes. Samme mønster som admin-PIN-
-// lagringen i admin.js (pb_admin_{klubbId}) -- skoped per klubb, slik at
-// et klubbytte på samme enhet aldri forhåndsutfyller feil spiller.
-// ════════════════════════════════════════════════════════
-function husketSpillerNokkel(klubbId) {
-  return `pb_husket_spiller_${klubbId}`;
-}
-
-function hentHusketSpillerId(klubbId) {
-  return localStorage.getItem(husketSpillerNokkel(klubbId)) || '';
-}
-
-function huskSpillerId(klubbId, spillerId) {
-  if (spillerId) localStorage.setItem(husketSpillerNokkel(klubbId), spillerId);
-  else localStorage.removeItem(husketSpillerNokkel(klubbId));
-}
-
 function sikreMeldInteresseModal() {
   if (document.getElementById('modal-meld-interesse')) return;
   document.body.insertAdjacentHTML('beforeend', `
@@ -230,11 +210,11 @@ async function tegnMeldInteresseInnhold(klubbId, runde) {
   // Forhåndsutfyll med sist husket spiller for DENNE klubben, forutsatt
   // at spilleren fortsatt finnes (kan ha blitt slettet av admin siden
   // sist -- se slettSpillerBekreft() i screens-ratingLists.js).
-  const husketId = hentHusketSpillerId(klubbId);
+  const husketId = hentMinSpillerId();
   if (husketId && spillerKart.has(husketId)) select.value = husketId;
 
   select.onchange = () => {
-    huskSpillerId(klubbId, select.value);
+    settMinSpillerId(select.value);
     visMinPameldingStatus(klubbId, runde.rundeId);
   };
 
@@ -311,7 +291,7 @@ window.lagreMeldInteresse = async function () {
   knapp.textContent = 'Melder på…';
   try {
     await pameldingRepo.meldPa(klubbId, runde.rundeId, spillerId, valgtSpor);
-    huskSpillerId(klubbId, spillerId); // sikkerhetsnett -- dekker første gangs valg uten select.onchange
+    settMinSpillerId(spillerId); // sikkerhetsnett -- dekker første gangs valg uten select.onchange
     visMelding('Du er påmeldt!');
     await tegnMeldInteresseInnhold(klubbId, runde);
     await visMinPameldingStatus(klubbId, runde.rundeId);
