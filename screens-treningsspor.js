@@ -136,12 +136,13 @@ window.apneNyOktFlereSpor = async function () {
   tegnOppsett();
 };
 
-/** Forhåndsutfyller spor-valg fra en åpen (eller sist lukkede) påmeldingsrunde, om noen finnes. */
+/** Forhåndsutfyller spor-valg fra en ÅPEN påmeldingsrunde, om noen finnes. En lukket
+ * runde (f.eks. fra en tidligere, allerede avsluttet økt) skal IKKE forhåndsutfylles. */
 async function forhandsutfyllFraPamelding() {
   try {
     const klubbId = hentAktivKlubbId();
     const runde = await pameldingRepo.hentRunde(klubbId);
-    if (!runde) return;
+    if (!runde || runde.status !== 'apen') return;
     const interesse = await pameldingRepo.hentInteresseForRunde(klubbId, runde.rundeId);
     interesse.forEach(i => {
       const indeks = ALLE_KONKURRANSER.indexOf(i.konkurranse);
