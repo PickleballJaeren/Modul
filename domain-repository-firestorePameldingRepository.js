@@ -59,16 +59,20 @@ export function lagFirestorePameldingRepository() {
     await deleteDoc(doc(db, SAM.SPOR_INTERESSE, interesseDokId(klubbId, spillerId)));
   }
 
-  /** Alle påmeldinger for GJELDENDE runde (filtrert på rundeId, ikke bare klubbId). */
+  /**
+   * Alle påmeldinger for GJELDENDE runde. Filtrerer KUN på klubbId
+   * server-side, og rundeId klient-side -- to samtidige likhets-where
+   * (klubbId OG rundeId) krever en sammensatt Firestore-indeks som ikke
+   * finnes i dette prosjektet, og feiler da stille (fanges av catch,
+   * returnerer tom liste -- admin ser "0 påmeldt" uten noen synlig feil).
+   * Samme trygge mønster som hentApenRunde() og hentSpillerKart() i
+   * state.js bruker.
+   */
   async function hentInteresseForRunde(klubbId, rundeId) {
     try {
-      const q = query(
-        collection(db, SAM.SPOR_INTERESSE),
-        where('klubbId', '==', klubbId),
-        where('rundeId', '==', rundeId),
-      );
+      const q = query(collection(db, SAM.SPOR_INTERESSE), where('klubbId', '==', klubbId));
       const snap = await getDocs(q);
-      return snap.docs.map(d => d.data());
+      return snap.docs.map(d => d.data()).filter(i => i.rundeId === rundeId);
     } catch (e) {
       console.error('[pameldingRepository] Kunne ikke hente interesse:', e);
       return [];
