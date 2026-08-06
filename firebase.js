@@ -45,6 +45,10 @@ export const SAM = {
   SKILL_TEST_RESULTATER:       'skillTestResults',          // id: {testType}_{timestamp} -- arkiv
   SKILL_TEST_TERSKLER:         'skillTestThresholds',       // id: {klubbId}_{testType}
   PLAYER_SKILL_TESTS:          'playerSkillTests',          // id: {spillerId}_{testType} -- gjeldende + historikk
+
+  // ── Påmelding til treningsspor — egne samlinger, se domain-repository-firestorePameldingRepository.js ──
+  PAMELDINGSRUNDER:            'pameldingsrunder',          // id: {klubbId} -- én aktiv runde per klubb
+  SPOR_INTERESSE:              'sporInteresse',              // id: {klubbId}_{spillerId}
 };
 
 // ════════════════════════════════════════════════════════

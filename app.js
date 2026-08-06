@@ -38,6 +38,9 @@ import { visOktResultat } from './screens-oktResultat.js';
 // window.apneSpillerprofil (se filen) -- MÅ importeres etter
 // screens-ratingLists.js, som er importert lenger opp i denne filen.
 import './screens-skillTests.js';
+// screens-pamelding.js kobler seg selv til window.* og injiserer UI i
+// hjem-klubb-handlinger -- ingen rekkefølgekrav mot andre screens-import.
+import './screens-pamelding.js';
 
 window.pinInput    = pinInput;
 window.bekreftPin  = bekreftPin;
