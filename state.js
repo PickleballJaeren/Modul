@@ -188,10 +188,20 @@ export function alleSporFerdigPlassert() {
   return liste.length > 0 && liste.every((_, i) => erFerdigPlassertISpor(i));
 }
 
+/**
+ * Regner ut sluttbane for hver plasserte spiller i ETT spor: to og to i
+ * trykkerekkefølge, MED forskyvning for banene foregående spor allerede
+ * opptar (samme forskyvning som ble brukt da startbanene ble generert i
+ * screens-treningsspor.js -- uten denne ville sluttbane alltid telt fra
+ * 1, mens startbane var globalt nummerert, og bevegelse-badgen ville
+ * vist en falsk flytting for alle spor etter det første).
+ */
 export function beregnSluttbanerForSpor(sporIndeks) {
-  const spor = sporVed(sporIndeks);
+  const liste = hentSporListe();
+  const baneOffset = liste.slice(0, sporIndeks).reduce((sum, s) => sum + (s.startBaner?.length ?? 0), 0);
+  const spor = liste[sporIndeks];
   const map = new Map();
-  spor?.plasseringer.forEach((id, i) => map.set(id, Math.floor(i / 2) + 1));
+  spor?.plasseringer.forEach((id, i) => map.set(id, Math.floor(i / 2) + 1 + baneOffset));
   return map;
 }
 
