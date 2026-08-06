@@ -78,7 +78,7 @@ function sikreSkjermer() {
     <div id="skjerm-treningsspor-oppsett" class="screen">
       <div class="app-header">
         <button class="tilbake-btn" onclick="naviger('hjem')">←</button>
-        <div style="flex:1"><div class="app-name">Ny økt · flere spor</div><div class="app-sub">Velg spor og spillere</div></div>
+        <div style="flex:1"><div class="app-name">Ny økt · flere aktiviteter</div><div class="app-sub">Velg aktiviteter og spillere</div></div>
       </div>
       <div class="scroll-omrade"><div id="treningsspor-oppsett-innhold"></div></div>
     </div>
@@ -86,7 +86,7 @@ function sikreSkjermer() {
     <div id="skjerm-treningsspor-baner" class="screen">
       <div class="app-header">
         <button class="tilbake-btn" onclick="naviger('treningsspor-oppsett')">←</button>
-        <div style="flex:1"><div class="app-name">Fordel baner</div><div class="app-sub">Juster antall baner per spor ved behov</div></div>
+        <div style="flex:1"><div class="app-name">Fordel baner</div><div class="app-sub">Juster antall baner per aktivitet ved behov</div></div>
       </div>
       <div class="scroll-omrade"><div id="treningsspor-baner-innhold"></div></div>
     </div>
@@ -94,7 +94,7 @@ function sikreSkjermer() {
     <div id="skjerm-treningsspor-aktiv" class="screen">
       <div class="app-header">
         <button class="tilbake-btn" onclick="naviger('hjem')">←</button>
-        <div style="flex:1"><div class="app-name">Pågår · flere spor</div><div class="app-sub">Baneliste</div></div>
+        <div style="flex:1"><div class="app-name">Pågår · flere aktiviteter</div><div class="app-sub">Baneliste</div></div>
         <span class="kat-tag kat-soft_play" style="background:rgba(34,197,94,.15);color:var(--green2)">Aktiv</span>
       </div>
       <div class="scroll-omrade"><div id="treningsspor-aktiv-innhold"></div></div>
@@ -103,7 +103,7 @@ function sikreSkjermer() {
     <div id="skjerm-treningsspor-sluttbane" class="screen">
       <div class="app-header">
         <button class="tilbake-btn" onclick="naviger('treningsspor-aktiv')">←</button>
-        <div style="flex:1"><div class="app-name">Registrer sluttbane</div><div class="app-sub">Trykk spillere i rekkefølge, per spor</div></div>
+        <div style="flex:1"><div class="app-name">Registrer sluttbane</div><div class="app-sub">Trykk spillere i rekkefølge, per aktivitet</div></div>
         <div class="header-teller" id="treningsspor-sluttbane-teller">0 av 0</div>
       </div>
       <div class="scroll-omrade"><div id="treningsspor-sluttbane-innhold"></div></div>
@@ -112,7 +112,7 @@ function sikreSkjermer() {
     <div id="skjerm-treningsspor-resultat" class="screen">
       <div class="app-header">
         <button class="tilbake-btn" onclick="naviger('hjem')">←</button>
-        <div style="flex:1"><div class="app-name">Resultat</div><div class="app-sub">Alle spor</div></div>
+        <div style="flex:1"><div class="app-name">Resultat</div><div class="app-sub">Alle aktiviteter</div></div>
       </div>
       <div class="scroll-omrade"><div id="treningsspor-resultat-innhold"></div></div>
     </div>
@@ -255,7 +255,7 @@ window.gaTilBanefordeling = function () {
     .filter(s => s.deltakerIder.length >= 2);
 
   if (aktiveSporForBaner.length === 0) {
-    visMelding('Velg minst 2 spillere i minst ett spor', 'advarsel');
+    visMelding('Velg minst 2 spillere i minst én aktivitet', 'advarsel');
     return;
   }
   tegnBanefordeling();
@@ -400,7 +400,7 @@ window.avbrytMultiSporOkt = function () {
   window.krevAdmin('Avbryt økt', 'Bekreft med PIN for å avbryte økten.', () => {
     apneSlettBekreft(
       'Avbryte økten?',
-      'Økten avsluttes uten at resultater lagres, for alle spor, og forsvinner for alle som følger den. Dette kan ikke angres.',
+      'Økten avsluttes uten at resultater lagres, for alle aktiviteter, og forsvinner for alle som følger den. Dette kan ikke angres.',
       async () => {
         nullstillOkt();
         await slettAktivOktFraSky();
@@ -596,7 +596,7 @@ function sikreKnapp() {
   const startKnapp = document.getElementById('hjem-start-okt-btn');
   const knappHtml = `
     <button class="knapp knapp-omriss" id="treningsspor-ny-okt-btn" style="width:100%;display:none" onclick="window.apneNyOktFlereSpor()">
-      Ny økt · flere spor
+      Ny økt · flere aktiviteter
     </button>`;
   if (startKnapp) startKnapp.insertAdjacentHTML('afterend', knappHtml);
   else wrapper.insertAdjacentHTML('afterbegin', knappHtml);

@@ -91,7 +91,7 @@ function sikreApneRundeModal() {
       <div class="modal">
         <div class="modal-tittel">Åpne påmelding</div>
         <input type="text" id="apne-pamelding-tittel" placeholder="F.eks. Mandag 12. august" style="width:100%;margin-bottom:14px">
-        <div style="font-size:13px;color:var(--muted2);margin-bottom:8px">Aktive spor denne runden</div>
+        <div style="font-size:13px;color:var(--muted2);margin-bottom:8px">Aktiviteter i denne runden</div>
         <div id="apne-pamelding-spor" style="margin-bottom:16px"></div>
         <button class="knapp knapp-primaer" style="width:100%;margin-bottom:10px" id="apne-pamelding-lagre-knapp" onclick="window.lagreApneRunde()">Åpne påmelding</button>
         <button class="knapp knapp-omriss" style="width:100%" onclick="window.lukkApnePameldingModal()">Avbryt</button>
@@ -105,7 +105,7 @@ window.apneAdminPamelding = function () {
     document.getElementById('apne-pamelding-tittel').value = '';
     document.getElementById('apne-pamelding-spor').innerHTML = ALLE_KONKURRANSER.map(k => `
       <label style="display:flex;align-items:center;gap:8px;padding:8px 0;font-size:14px">
-        <input type="checkbox" id="apne-pamelding-spor-${k}" checked>${escHtml(KONKURRANSE_NAVN[k] ?? k)}
+        <input type="checkbox" id="apne-pamelding-spor-${k}">${escHtml(KONKURRANSE_NAVN[k] ?? k)}
       </label>
     `).join('');
     document.getElementById('modal-apne-pamelding').style.display = 'flex';
@@ -120,7 +120,7 @@ window.lukkApnePameldingModal = function () {
 window.lagreApneRunde = async function () {
   const aktiveSpor = ALLE_KONKURRANSER.filter(k => document.getElementById(`apne-pamelding-spor-${k}`)?.checked);
   if (!aktiveSpor.length) {
-    visMelding('Velg minst ett spor', 'advarsel');
+    visMelding('Velg minst én aktivitet', 'advarsel');
     return;
   }
   const tittel = document.getElementById('apne-pamelding-tittel').value.trim() || 'Påmelding';
@@ -161,13 +161,33 @@ window.lukkAdminPamelding = function () {
 
 let valgtSpor = null;
 
+// ════════════════════════════════════════════════════════
+// HUSKET SPILLER — lagrer siste "Hvem er du?"-valg per klubb i
+// localStorage, slik at spilleren slipper å velge seg selv på nytt hver
+// gang en ny påmeldingsrunde åpnes. Samme mønster som admin-PIN-
+// lagringen i admin.js (pb_admin_{klubbId}) -- skoped per klubb, slik at
+// et klubbytte på samme enhet aldri forhåndsutfyller feil spiller.
+// ════════════════════════════════════════════════════════
+function husketSpillerNokkel(klubbId) {
+  return `pb_husket_spiller_${klubbId}`;
+}
+
+function hentHusketSpillerId(klubbId) {
+  return localStorage.getItem(husketSpillerNokkel(klubbId)) || '';
+}
+
+function huskSpillerId(klubbId, spillerId) {
+  if (spillerId) localStorage.setItem(husketSpillerNokkel(klubbId), spillerId);
+  else localStorage.removeItem(husketSpillerNokkel(klubbId));
+}
+
 function sikreMeldInteresseModal() {
   if (document.getElementById('modal-meld-interesse')) return;
   document.body.insertAdjacentHTML('beforeend', `
     <div class="modal-bakgrunn" id="modal-meld-interesse" style="display:none" onclick="if(event.target===this)window.lukkMeldInteresse()">
       <div class="modal">
         <div class="modal-tittel" id="meld-interesse-tittel">Påmelding</div>
-        <div style="font-size:13px;color:var(--muted2);margin-bottom:8px">Velg spor</div>
+        <div style="font-size:13px;color:var(--muted2);margin-bottom:8px">Velg aktivitet</div>
         <div id="meld-interesse-spor" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px"></div>
         <div style="font-size:13px;color:var(--muted2);margin-bottom:8px">Hvem er du?</div>
         <select id="meld-interesse-spiller" style="width:100%;margin-bottom:16px"></select>
@@ -206,9 +226,22 @@ async function tegnMeldInteresseInnhold(klubbId, runde) {
   const select = document.getElementById('meld-interesse-spiller');
   select.innerHTML = `<option value="">— Velg deg selv —</option>` +
     alternativer.map(([id, navn]) => `<option value="${id}">${escHtml(navn)}</option>`).join('');
-  select.onchange = () => visMinPameldingStatus(klubbId, runde.rundeId);
+
+  // Forhåndsutfyll med sist husket spiller for DENNE klubben, forutsatt
+  // at spilleren fortsatt finnes (kan ha blitt slettet av admin siden
+  // sist -- se slettSpillerBekreft() i screens-ratingLists.js).
+  const husketId = hentHusketSpillerId(klubbId);
+  if (husketId && spillerKart.has(husketId)) select.value = husketId;
+
+  select.onchange = () => {
+    huskSpillerId(klubbId, select.value);
+    visMinPameldingStatus(klubbId, runde.rundeId);
+  };
 
   document.getElementById('meld-interesse-status').textContent = '';
+  // Vis status med det samme dersom vi forhåndsutfylte -- ellers ser ikke
+  // spilleren at hen allerede er påmeldt før hen trykker noe selv.
+  if (select.value) await visMinPameldingStatus(klubbId, runde.rundeId);
 }
 
 /**
@@ -263,7 +296,7 @@ window.lagreMeldInteresse = async function () {
     return;
   }
   if (!valgtSpor) {
-    visMelding('Velg et spor', 'advarsel');
+    visMelding('Velg en aktivitet', 'advarsel');
     return;
   }
   const klubbId = hentAktivKlubbId();
@@ -278,6 +311,7 @@ window.lagreMeldInteresse = async function () {
   knapp.textContent = 'Melder på…';
   try {
     await pameldingRepo.meldPa(klubbId, runde.rundeId, spillerId, valgtSpor);
+    huskSpillerId(klubbId, spillerId); // sikkerhetsnett -- dekker første gangs valg uten select.onchange
     visMelding('Du er påmeldt!');
     await tegnMeldInteresseInnhold(klubbId, runde);
     await visMinPameldingStatus(klubbId, runde.rundeId);
