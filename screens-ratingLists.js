@@ -7,7 +7,7 @@
 import { db, SAM, collection, query, where, orderBy, limit, getDocs, doc, getDoc, setDoc } from './firebase.js';
 import { lagBatchHjelper } from './batch-helpers.js';
 import { escHtml, naviger, visMelding } from './ui.js';
-import { hentSpillerKart, hentRatingService } from './state.js';
+import { hentSpillerKart, hentRatingService, hentAktivKlubbId } from './state.js';
 import { getErAdmin } from './admin.js';
 import { ALLE_KATEGORIER, ALLE_KONKURRANSER, RATINGKATEGORI_NAVN, STARTRATING, KONKURRANSE_NAVN } from './domain-constants.js';
 
@@ -41,6 +41,28 @@ function beregnGridVerdier(minV, maxV) {
 }
 
 let aktivFane = 'allround';
+
+// ════════════════════════════════════════════════════════
+// CACHE — playerAllround/playerCategoryRatings har ingen klubbId-felt
+// (se kommentaren i tegnListe()), så hver spørring må lese HELE
+// samlingen (alle klubber) og filtrere lokalt. Uten cache trigges dette
+// på nytt for hvert eneste trykk mellom de 5 fanene, og på hvert besøk
+// til skjermen -- svært kostbart i antall Firestore-lesinger over en
+// treningskveld. Cachet 5 min per (klubbId, fane)-kombinasjon.
+// Datofilter/klubbId-filter i selve spørringen er IKKE løst her -- det
+// krever at klubbId lagres på dokumentene (skjemaendring), se samtale.
+// ════════════════════════════════════════════════════════
+const RATING_TTL_MS = 5 * 60 * 1000;
+const _ratingCache = new Map(); // key: `${klubbId}:${fane}` -> { rader, hentetMs }
+
+function ratingCacheKey(fane) {
+  return `${hentAktivKlubbId() ?? ''}:${fane}`;
+}
+
+/** Forkaster cachet data for gjeldende klubb+fane -- kalles etter en skriveoperasjon. */
+function nullstillRatingCache() {
+  _ratingCache.clear(); // enkel og trygg: rammer sjelden nok (kun ved rediger/slett) til at full tømming er greit
+}
 
 export async function visRatinglister() {
   naviger('ratinglister');
@@ -88,9 +110,16 @@ export async function byttRatingFane(faneId) {
 }
 window.byttRatingFane = byttRatingFane;
 
-async function tegnListe() {
+async function tegnListe(tvingOppdatering = false) {
   const listeContainer = document.getElementById('rating-liste-innhold');
   const spillerKart = await hentSpillerKart(); // Map<spillerId, navn>, avgrenset til aktiv klubb
+
+  const cacheKey = ratingCacheKey(aktivFane);
+  const cachet = _ratingCache.get(cacheKey);
+  if (!tvingOppdatering && cachet && (Date.now() - cachet.hentetMs) < RATING_TTL_MS) {
+    tegnRader(listeContainer, cachet.rader);
+    return;
+  }
 
   // VIKTIG: playerCategoryRatings/playerAllround har ingen klubbId-felt
   // (se ARKITEKTUR.md-datamodellen), så spørringen mot Firestore
@@ -103,7 +132,9 @@ async function tegnListe() {
   // limit(50) er derfor droppet fra selve spørringen -- vi må hente
   // bredt nok til at klubbens egne topp-50 ikke kuttes bort FØR
   // filtreringen, og tar i stedet topp 50 ETTER at andre klubber er
-  // filtrert bort.
+  // filtrert bort. Resultatet CACHES (se RATING_TTL_MS over) siden
+  // dette er en full, ufiltrert samlings-lesing -- uten cache koster
+  // hvert eneste trykk mellom fanene et helt nytt scan.
   let rader;
   try {
     if (aktivFane === 'allround') {
@@ -131,6 +162,12 @@ async function tegnListe() {
     return;
   }
 
+  _ratingCache.set(cacheKey, { rader, hentetMs: Date.now() });
+  tegnRader(listeContainer, rader);
+}
+
+/** Selve HTML-opptegningen -- skilt ut fra tegnListe() slik at et cache-treff kan tegne uten nettverkskall. */
+function tegnRader(listeContainer, rader) {
   if (rader.length === 0) {
     listeContainer.innerHTML = '<div class="tom-tilstand-liten">Ingen ratinger registrert ennå</div>';
     return;
@@ -567,7 +604,10 @@ export function apneSlettBekreft(tittel, tekst, handling, suksessTekst = 'Slette
       visMelding(suksessTekst);
       // Om vi nettopp slettet ratingen som vises, tegn listen på nytt tom
       // -- men kun dersom ratinglister-skjermen faktisk er den som er åpen.
-      if (document.getElementById('rating-liste-innhold')) await tegnListe();
+      // tvingOppdatering=true: forbi cachen, ellers ville admin sett den
+      // slettede spilleren stå igjen i opptil RATING_TTL_MS til.
+      nullstillRatingCache();
+      if (document.getElementById('rating-liste-innhold')) await tegnListe(true);
     } catch (e) {
       console.error('[admin] Handlingen feilet:', e);
       visMelding('Noe gikk galt', 'feil');
@@ -667,7 +707,8 @@ async function lagreRedigertRating(spillerId, kategori, nyVerdi) {
     // kjøres etter en vanlig fullført økt.
     await hentRatingService()?.oppdaterAllround(spillerId);
     visMelding('Rating oppdatert');
-    await tegnListe();
+    nullstillRatingCache();
+    await tegnListe(true);
   } catch (e) {
     console.error('[ratingLists] Kunne ikke oppdatere rating:', e);
     visMelding('Noe gikk galt', 'feil');
