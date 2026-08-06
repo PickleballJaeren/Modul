@@ -136,6 +136,65 @@ export function beregnSluttbaner() {
 
 export function nullstillOkt() { okt = null; }
 
+// ── Multi-spor (treningsspor) ──────────────────────────────────────
+// ADDITIVT lag oppå det som allerede finnes over -- ingen av
+// funksjonene over er endret. Brukes KUN av screens-treningsspor.js.
+// Enkelt-spor-flyten (competitions/registerPlayers/activeSession/
+// registerFinish/oktResultat) kjenner ikke til og bruker aldri disse.
+
+function sporVed(sporIndeks) {
+  return okt?.sporListe?.[sporIndeks] ?? null;
+}
+
+/** Starter en økt med FLERE spor samtidig. sporValg: [{ konkurranse, deltakerIder }]. */
+export function startFlereSpor(sporValg) {
+  okt = {
+    sporListe: sporValg.map(s => ({
+      konkurranse: s.konkurranse,
+      deltakerIder: [...s.deltakerIder],
+      startBaner: null,
+      plasseringer: [],
+    })),
+  };
+}
+
+export function hentSporListe() {
+  return okt?.sporListe ?? [];
+}
+
+export function settStartBanerForSpor(sporIndeks, baner) {
+  const spor = sporVed(sporIndeks);
+  if (spor) spor.startBaner = baner;
+}
+
+export function plasserSpillerISpor(sporIndeks, spillerId) {
+  const spor = sporVed(sporIndeks);
+  if (!spor || spor.plasseringer.includes(spillerId)) return;
+  spor.plasseringer.push(spillerId);
+}
+
+export function angreSisteePlasseringISpor(sporIndeks) {
+  const spor = sporVed(sporIndeks);
+  if (spor) spor.plasseringer.pop();
+}
+
+export function erFerdigPlassertISpor(sporIndeks) {
+  const spor = sporVed(sporIndeks);
+  return !!spor && spor.plasseringer.length === spor.deltakerIder.length;
+}
+
+export function alleSporFerdigPlassert() {
+  const liste = hentSporListe();
+  return liste.length > 0 && liste.every((_, i) => erFerdigPlassertISpor(i));
+}
+
+export function beregnSluttbanerForSpor(sporIndeks) {
+  const spor = sporVed(sporIndeks);
+  const map = new Map();
+  spor?.plasseringer.forEach((id, i) => map.set(id, Math.floor(i / 2) + 1));
+  return map;
+}
+
 // ── Delt RatingService-instans ─────────────────────────
 // Satt opp én gang i app.js med ekte avhengigheter (Firestore-repo,
 // pairwise-algoritme osv.), hentet herfra av skjermene som trenger
@@ -246,10 +305,11 @@ export async function lagreAktivOktTilSky() {
   const ref = aktivOktRef();
   const spor = gjeldendeSpor();
   if (!ref || !spor?.startBaner) return;
+  const alleDeltakere = okt.sporListe.flatMap(s => s.deltakerIder);
   await setDoc(ref, {
     status: 'aktiv',
     sporListe: okt.sporListe,
-    spillerNavn: byggSpillerNavnKart(spor.deltakerIder),
+    spillerNavn: byggSpillerNavnKart(alleDeltakere),
     oppdatert: serverTimestamp(),
   });
 }
@@ -272,6 +332,27 @@ export async function fullforAktivOktISky(resultat) {
     konkurranse: resultat.konkurranse,
     resultat,
     spillerNavn: byggSpillerNavnKart(ider),
+    oppdatert: serverTimestamp(),
+  });
+}
+
+/**
+ * Markerer den delte økten som fullført, med resultat fra FLERE spor.
+ * Additiv variant av fullforAktivOktISky() over -- brukes kun av
+ * screens-treningsspor.js. Live-siden (live.js) og "pågående økt"-
+ * kortet (app.js) viser i denne omgangen ikke et fullt resultat for
+ * multi-spor-økter (kjent, bevisst avgrenset v1-begrensning) -- selve
+ * lagringen i arkivet (ratingService.fullforOkt() per spor) er upåvirket
+ * og fullstendig uansett.
+ */
+export async function fullforFlereSporISky(resultater) {
+  const ref = aktivOktRef();
+  if (!ref) return;
+  const alleIder = resultater.flatMap(r => r.resultatPerSpiller.map(x => x.spillerId));
+  await setDoc(ref, {
+    status: 'fullfort',
+    resultater,
+    spillerNavn: byggSpillerNavnKart(alleIder),
     oppdatert: serverTimestamp(),
   });
 }

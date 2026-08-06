@@ -41,6 +41,10 @@ import './screens-skillTests.js';
 // screens-pamelding.js kobler seg selv til window.* og injiserer UI i
 // hjem-klubb-handlinger -- ingen rekkefølgekrav mot andre screens-import.
 import './screens-pamelding.js';
+// screens-treningsspor.js kobler seg selv til window.* og injiserer sin
+// egen "Ny økt · flere spor"-knapp -- gjenopptaMultiSporOkt hentes ut
+// eksplisitt for bruk i apnePagaendeOkt() under.
+import { gjenopptaMultiSporOkt, visMultiSporResultatFraData } from './screens-treningsspor.js';
 
 window.pinInput    = pinInput;
 window.bekreftPin  = bekreftPin;
@@ -327,10 +331,12 @@ window.apnePagaendeOkt = function () {
   if (!sisteAktivOktData) return;
   if (sisteAktivOktData.status === 'fullfort') {
     flettInnSpillerNavn(sisteAktivOktData.spillerNavn);
-    visOktResultat(sisteAktivOktData.resultat);
+    if (sisteAktivOktData.resultater) visMultiSporResultatFraData(sisteAktivOktData.resultater);
+    else visOktResultat(sisteAktivOktData.resultat);
     return;
   }
   gjenopprettOktLokalt(sisteAktivOktData);
+  if ((sisteAktivOktData.sporListe?.length ?? 1) > 1) { gjenopptaMultiSporOkt(); return; }
   const spor = forsteSporData(sisteAktivOktData);
   if ((spor.plasseringer?.length ?? 0) > 0) visRegistrerSluttbane();
   else visAktivOkt();
