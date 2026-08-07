@@ -2,7 +2,7 @@
 // sw.js — Service Worker for 1 vs 1 (flat filstruktur)
 // Samme cache-shell-strategi som Stafettligaen sin sw.js.
 // ════════════════════════════════════════════════════════
-const VERSJON    = 7; // bumpet: leaderboard/arkiv-omstrukturering + rules-innstramming, se KVOTE.md
+const VERSJON    = 8; // bumpet: leaderboard/arkiv-omstrukturering + rules-innstramming, se KVOTE.md
 const CACHE_NAVN = `1vs1-v${VERSJON}`;
 
 const SHELL = [
