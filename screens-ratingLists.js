@@ -132,7 +132,7 @@ async function tegnListe(tvingOppdatering = false) {
   const cacheKey = ratingCacheKey(aktivFane);
   const cachetRader = !tvingOppdatering ? _ratingCache.hent(cacheKey) : null;
   if (cachetRader) {
-    tegnRader(listeContainer, cachetRader);
+    tegnRader(listeContainer, cachetRader, spillerKart);
     return;
   }
 
@@ -155,11 +155,11 @@ async function tegnListe(tvingOppdatering = false) {
   }
 
   _ratingCache.sett(cacheKey, rader);
-  tegnRader(listeContainer, rader);
+  tegnRader(listeContainer, rader, spillerKart);
 }
 
 /** Selve HTML-opptegningen -- skilt ut fra tegnListe() slik at et cache-treff kan tegne uten nettverkskall. */
-function tegnRader(listeContainer, rader) {
+function tegnRader(listeContainer, rader, spillerKart) {
   if (rader.length === 0) {
     listeContainer.innerHTML = '<div class="tom-tilstand-liten">Ingen ratinger registrert ennå</div>';
     return;
