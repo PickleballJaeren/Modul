@@ -9,7 +9,10 @@
 // Repository-kontrakt (IRatingRepository) forventet av denne servicen:
 //   hentRatingForKategori(spillerId, kategori)        -> { elo, historikk } | null
 //   hentFremgangForKonkurranse(spillerId, konkurranse) -> { treningsAntall, status } | null
-//   lagreOktResultat(oktResultat)                      -> Promise<void>
+//   lagreOktResultat(oktResultat, klubbId)             -> Promise<void>
+//   lagreAllround(spillerId, allroundVerdi, klubbId)   -> Promise<void>
+//   lagreAllroundFlere(oppdateringer, klubbId)         -> Promise<void>
+//     der oppdateringer = {spillerId, allroundVerdi}[]
 // ════════════════════════════════════════════════════════
 
 import { STARTRATING, kategoriForKonkurranse, ALLE_KATEGORIER } from './domain-constants.js';
@@ -91,16 +94,8 @@ export function lagRatingService({
     return { konkurranse, kategori, resultatPerSpiller };
   }
 
-  /** Steg 3: lagrer økten og oppdaterer alt som avhenger av den, inkl. allround. */
-  async function fullforOkt(oktResultat) {
-    await repository.lagreOktResultat(oktResultat);
-
-    const beroerteSpillere = oktResultat.resultatPerSpiller.map(r => r.spillerId);
-    await Promise.all(beroerteSpillere.map(id => oppdaterAllround(id)));
-  }
-
-  /** Regner ut og lagrer allround-rating for én spiller på nytt. */
-  async function oppdaterAllround(spillerId) {
+  /** Ren beregning (ingen lagring) -- delt av oppdaterAllround() og fullforOkt() under. */
+  async function beregnAllroundVerdi(spillerId) {
     const ratingerPerKategori = {};
 
     // De 4 kategoriene er uavhengige lesinger -- hent parallelt i stedet
@@ -110,12 +105,43 @@ export function lagRatingService({
         repository.hentRatingForKategori(spillerId, kategori).then(rating => ({ kategori, rating })),
       ),
     );
-    ratinger.forEach(({ kategori, rating }) => {
-      if (rating) ratingerPerKategori[kategori] = rating.elo;
-    });
+    const ratingerPerKategoriUtfylt = ratinger.reduce((acc, { kategori, rating }) => {
+      if (rating) acc[kategori] = rating.elo;
+      return acc;
+    }, ratingerPerKategori);
 
-    const allround = allroundKalkulator.beregnAllround(ratingerPerKategori);
-    await repository.lagreAllround(spillerId, allround);
+    return allroundKalkulator.beregnAllround(ratingerPerKategoriUtfylt);
+  }
+
+  /**
+   * Steg 3: lagrer økten og oppdaterer alt som avhenger av den, inkl.
+   * allround. @param {string} klubbId -- se lagreOktResultat() i
+   * repositoryet for hvorfor dette nå er påkrevd.
+   */
+  async function fullforOkt(oktResultat, klubbId) {
+    await repository.lagreOktResultat(oktResultat, klubbId);
+
+    const beroerteSpillere = oktResultat.resultatPerSpiller.map(r => r.spillerId);
+    // Regn ut allround for ALLE berørte spillere parallelt (kun lesing,
+    // ingen skriving her ennå -- trygt å parallellisere). Selve lagringen
+    // skjer samlet rett under, via lagreAllroundFlere() -- IKKE ved å
+    // kalle oppdaterAllround() i en løkke, som ville gitt N separate
+    // lesing+skriving-runder mot samme leaderboard-dokument og latt de
+    // fleste av dem overskrive hverandre (se forklaring i
+    // leaderboardRepository.js).
+    const verdier = await Promise.all(beroerteSpillere.map(beregnAllroundVerdi));
+    const oppdateringer = beroerteSpillere.map((spillerId, i) => ({ spillerId, allroundVerdi: verdier[i] }));
+    await repository.lagreAllroundFlere(oppdateringer, klubbId);
+  }
+
+  /**
+   * Regner ut og lagrer allround-rating for ÉN spiller på nytt --
+   * brukt av enkeltstående kall (f.eks. manuell rating-redigering, som
+   * berører kun én spiller). @param {string} klubbId
+   */
+  async function oppdaterAllround(spillerId, klubbId) {
+    const allround = await beregnAllroundVerdi(spillerId);
+    await repository.lagreAllround(spillerId, allround, klubbId);
     return allround;
   }
 

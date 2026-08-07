@@ -497,7 +497,7 @@ async function utforFullforingMultiSpor() {
       const spor = sporListe[i];
       const sluttbaner = beregnSluttbanerForSpor(i);
       const resultat = await ratingService.beregnOktResultat(spor.konkurranse, spor.startBaner, sluttbaner);
-      await ratingService.fullforOkt(resultat);
+      await ratingService.fullforOkt(resultat, hentAktivKlubbId());
       resultater.push(resultat);
     }
 

@@ -1,34 +1,36 @@
 // ════════════════════════════════════════════════════════
 // archive.js — Arkiv-skjermen
-// Hver økt lagres direkte i sessions/-samlingen når den fullføres
-// (se firestoreRatingRepository.js) -- ingen egen arkiv-samling.
+// Hver økt lagres i klubbens EGEN subcollection (klubber/{klubbId}/
+// sessions) når den fullføres, se domain-repository-
+// firestoreRatingRepository.js sin lagreOktResultat() -- ingen egen
+// arkiv-samling, og ikke lenger noen flat, delt samling på tvers av
+// klubber (se KVOTE.md for hvorfor dette ble endret).
 // ════════════════════════════════════════════════════════
 
-import { db, SAM, collection, query, orderBy, getDocs } from './firebase.js';
+import { oktSamling, query, orderBy, limit, getDocs } from './firebase.js';
 import { escHtml, naviger } from './ui.js';
 import { hentSpillerKart, hentAktivKlubbId } from './state.js';
 import { KONKURRANSE_NAVN } from './domain-constants.js';
 import { IKON } from './screens-competitions.js';
 import { bevegelseBadge } from './screens-registerFinish.js';
-import { hentKlubbSpillerIder } from './screens-ratingLists.js';
+import { lagSessionCache } from './cache-helpers.js';
 
 // oktId -> rå Firestore-data, satt ved visArkiv(). Brukes av
 // visOktDetaljer() slik at vi slipper å hente økten på nytt ved klikk.
 let oktKart = new Map();
 
 // ════════════════════════════════════════════════════════
-// CACHE — sessions har ingen klubbId-felt, så spørringen leser HELE
-// samlingen (alle klubber, all historikk) hver gang Arkiv åpnes.
-// Cachet 5 min per klubb -- samme begrunnelse/mønster som i
-// screens-ratingLists.js sin RATING_TTL_MS. exportOppdaterArkivCache()
-// kan kalles fra andre moduler (f.eks. etter sletting av arkivet i
-// screens-ratingLists.js) for å tvinge en fersk henting neste besøk.
+// CACHE — spørringen er nå naturlig avgrenset til egen klubb (subcollection
+// + limit, se visArkiv() under), så dette er ikke lenger en "unngå å
+// scanne alt"-cache, men en enkel "unngå unødvendige nettverkskall ved
+// gjentatte besøk"-cache. Speilet til sessionStorage (se
+// cache-helpers.js) slik at den overlever en sideoppdatering.
 // ════════════════════════════════════════════════════════
-const ARKIV_TTL_MS = 5 * 60 * 1000;
-let _arkivCache = null; // { klubbId, klubbOkter, hentetMs } | null
+const ARKIV_TTL_MS = 15 * 60 * 1000;
+const _arkivCache = lagSessionCache('arkiv', ARKIV_TTL_MS);
 
 export function nullstillArkivCache() {
-  _arkivCache = null;
+  _arkivCache.tomAlt();
 }
 
 function datoTekstFor(okt) {
@@ -63,33 +65,27 @@ export async function visArkiv(tvingOppdatering = false) {
   const container = document.getElementById('arkiv-innhold');
   const klubbId = hentAktivKlubbId();
 
-  if (!tvingOppdatering && _arkivCache && _arkivCache.klubbId === klubbId
-      && (Date.now() - _arkivCache.hentetMs) < ARKIV_TTL_MS) {
-    tegnArkivListe(container, _arkivCache.klubbOkter);
+  const cachetOkter = !tvingOppdatering ? _arkivCache.hent(klubbId) : null;
+  if (cachetOkter) {
+    tegnArkivListe(container, cachetOkter);
     return;
   }
 
   container.innerHTML = '<div class="laster"><span class="laster-snurr"></span>Henter arkiv…</div>';
 
   try {
-    // VIKTIG: sessions har ingen klubbId-felt (se ARKITEKTUR.md-
-    // datamodellen), så spørringen returnerer økter fra ALLE klubber.
-    // Filtrerer på klientsiden mot klubbens kjente spiller-IDer -- samme
-    // mønster som brukes for administrasjons-slettingen (og nå også
-    // ratinglisten, se hentKlubbSpillerIder() i screens-ratingLists.js).
-    // Uten dette ville andre klubbers økter vist seg her. Resultatet
-    // caches (se ARKIV_TTL_MS over) siden dette er en full, ufiltrert
-    // samlings-lesing.
-    const klubbSpillerIder = await hentKlubbSpillerIder();
-    const q = query(collection(db, SAM.SESSIONS), orderBy('dato', 'desc'));
+    // Spør KUN klubbens egen subcollection -- ingen klientside-filtrering
+    // nødvendig lenger, siden strukturen selv garanterer at det som
+    // ligger her tilhører denne klubben (se firebase.js/
+    // firestoreRatingRepository.js). limit(50) er nå en ekte, håndhevet
+    // grense på selve spørringen, ikke bare et kutt etter at alt allerede
+    // er lest -- arkivet blir ikke dyrere å åpne etter hvert som klubben
+    // spiller flere økter over tid.
+    const q = query(oktSamling(klubbId), orderBy('dato', 'desc'), limit(50));
     const snap = await getDocs(q);
+    const klubbOkter = snap.docs.map(d => ({ id: d.id, okt: d.data() }));
 
-    const klubbOkter = snap.docs
-      .filter(d => (d.data().resultatPerSpiller ?? []).some(r => klubbSpillerIder.has(r.spillerId)))
-      .slice(0, 50)
-      .map(d => ({ id: d.id, okt: d.data() }));
-
-    _arkivCache = { klubbId, klubbOkter, hentetMs: Date.now() };
+    _arkivCache.sett(klubbId, klubbOkter);
     tegnArkivListe(container, klubbOkter);
   } catch (e) {
     console.error('[arkiv] Kunne ikke hente økter:', e);

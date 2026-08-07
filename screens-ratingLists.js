@@ -4,12 +4,20 @@
 // som vises, uten å navigere bort fra skjermen.
 // ════════════════════════════════════════════════════════
 
-import { db, SAM, collection, query, where, orderBy, limit, getDocs, doc, getDoc, setDoc } from './firebase.js';
+import {
+  db, SAM, collection, query, where, orderBy, limit, getDocs, doc, getDoc, setDoc,
+  oktSamling,
+} from './firebase.js';
 import { lagBatchHjelper } from './batch-helpers.js';
 import { escHtml, naviger, visMelding } from './ui.js';
 import { hentSpillerKart, hentRatingService, hentAktivKlubbId } from './state.js';
 import { getErAdmin } from './admin.js';
 import { ALLE_KATEGORIER, ALLE_KONKURRANSER, RATINGKATEGORI_NAVN, STARTRATING, KONKURRANSE_NAVN } from './domain-constants.js';
+import {
+  hentLeaderboard, oppdaterLeaderboardRad, fjernFraLeaderboard,
+} from './domain-repository-leaderboardRepository.js';
+import { lagSessionCache } from './cache-helpers.js';
+import { nullstillArkivCache } from './screens-archive.js';
 
 const KATEGORI_IKON = { soft_play: '🎯', power_play: '⚡', defense: '🛡️', singles: '🙋', allround: '🏆' };
 const KATEGORI_FARGE = {
@@ -43,25 +51,32 @@ function beregnGridVerdier(minV, maxV) {
 let aktivFane = 'allround';
 
 // ════════════════════════════════════════════════════════
-// CACHE — playerAllround/playerCategoryRatings har ingen klubbId-felt
-// (se kommentaren i tegnListe()), så hver spørring må lese HELE
-// samlingen (alle klubber) og filtrere lokalt. Uten cache trigges dette
-// på nytt for hvert eneste trykk mellom de 5 fanene, og på hvert besøk
-// til skjermen -- svært kostbart i antall Firestore-lesinger over en
-// treningskveld. Cachet 5 min per (klubbId, fane)-kombinasjon.
-// Datofilter/klubbId-filter i selve spørringen er IKKE løst her -- det
-// krever at klubbId lagres på dokumentene (skjemaendring), se samtale.
+// CACHE — leaderboards/{klubbId}_{fane} er allerede ett lite, billig
+// dokumentoppslag (se tegnListe() under), så cache her er ikke lenger
+// et spørsmål om å unngå en dyr full samlings-scan (det problemet er
+// løst av selve leaderboard-strukturen) -- men det er fortsatt gratis
+// å unngå unødvendige nettverkskall ved rask faneklikking. Speilet til
+// sessionStorage (se cache-helpers.js) slik at det også overlever en
+// sideoppdatering, med en romslig TTL siden rating uansett kun endres
+// når noen fullfører en økt eller redigerer manuelt -- begge steder
+// invaliderer vi den aktuelle nøkkelen aktivt med det samme, se
+// nullstillRatingCacheFor()/nullstillRatingCache() under.
 // ════════════════════════════════════════════════════════
-const RATING_TTL_MS = 5 * 60 * 1000;
-const _ratingCache = new Map(); // key: `${klubbId}:${fane}` -> { rader, hentetMs }
+const RATING_TTL_MS = 20 * 60 * 1000;
+const _ratingCache = lagSessionCache('rating', RATING_TTL_MS);
 
 function ratingCacheKey(fane) {
   return `${hentAktivKlubbId() ?? ''}:${fane}`;
 }
 
-/** Forkaster cachet data for gjeldende klubb+fane -- kalles etter en skriveoperasjon. */
+/** Forkaster cachet data for ÉN klubb+fane -- kalles etter en skriveoperasjon som kun rammer den fanen. */
+function nullstillRatingCacheFor(fane) {
+  _ratingCache.slett(ratingCacheKey(fane));
+}
+
+/** Forkaster ALL cachet ratingdata (alle faner) -- brukes ved handlinger som kan ramme flere faner (sletting/administrasjon). */
 function nullstillRatingCache() {
-  _ratingCache.clear(); // enkel og trygg: rammer sjelden nok (kun ved rediger/slett) til at full tømming er greit
+  _ratingCache.tomAlt();
 }
 
 export async function visRatinglister() {
@@ -115,54 +130,31 @@ async function tegnListe(tvingOppdatering = false) {
   const spillerKart = await hentSpillerKart(); // Map<spillerId, navn>, avgrenset til aktiv klubb
 
   const cacheKey = ratingCacheKey(aktivFane);
-  const cachet = _ratingCache.get(cacheKey);
-  if (!tvingOppdatering && cachet && (Date.now() - cachet.hentetMs) < RATING_TTL_MS) {
-    tegnRader(listeContainer, cachet.rader);
+  const cachetRader = !tvingOppdatering ? _ratingCache.hent(cacheKey) : null;
+  if (cachetRader) {
+    tegnRader(listeContainer, cachetRader);
     return;
   }
 
-  // VIKTIG: playerCategoryRatings/playerAllround har ingen klubbId-felt
-  // (se ARKITEKTUR.md-datamodellen), så spørringen mot Firestore
-  // returnerer ratinger for ALLE klubber. Uten client-side-filtrering
-  // her ville andre klubbers spillere (og dermed også andre klubbers
-  // manuelt tillagte spillere, uten oppløsbart navn) vist seg i listen.
-  // Samme mønster som hentKlubbSpillerIder()/slettAllRatingForKlubb()
-  // lenger ned i filen bruker for administrasjons-slettingen.
-  //
-  // limit(50) er derfor droppet fra selve spørringen -- vi må hente
-  // bredt nok til at klubbens egne topp-50 ikke kuttes bort FØR
-  // filtreringen, og tar i stedet topp 50 ETTER at andre klubber er
-  // filtrert bort. Resultatet CACHES (se RATING_TTL_MS over) siden
-  // dette er en full, ufiltrert samlings-lesing -- uten cache koster
-  // hvert eneste trykk mellom fanene et helt nytt scan.
+  // Leaderboard-dokumentet (leaderboards/{klubbId}_{fane}, se
+  // domain-repository-leaderboardRepository.js) er allerede sortert og
+  // kappet ved 50 -- ÉTT dokumentoppslag i stedet for å scanne hele
+  // playerCategoryRatings/playerAllround (alle klubber, alle spillere).
+  // Filtreringen mot spillerKart under er nå kun et sikkerhetsnett (bør
+  // normalt aldri fjerne noen, siden leaderboardet vedlikeholdes av
+  // samme skriving som selve rating-verdien) -- IKKE den bærende
+  // filtreringsmekanismen slik det var med full samlings-lesing.
   let rader;
   try {
-    if (aktivFane === 'allround') {
-      const q = query(collection(db, SAM.PLAYER_ALLROUND), orderBy('allround', 'desc'));
-      const snap = await getDocs(q);
-      rader = snap.docs
-        .map(d => ({ spillerId: d.data().spillerId, verdi: d.data().allround }))
-        .filter(r => spillerKart.has(r.spillerId))
-        .slice(0, 50);
-    } else {
-      const q = query(
-        collection(db, SAM.PLAYER_CATEGORY_RATINGS),
-        where('kategori', '==', aktivFane),
-        orderBy('elo', 'desc'),
-      );
-      const snap = await getDocs(q);
-      rader = snap.docs
-        .map(d => ({ spillerId: d.data().spillerId, verdi: d.data().elo }))
-        .filter(r => spillerKart.has(r.spillerId))
-        .slice(0, 50);
-    }
+    const leaderboardRader = await hentLeaderboard(hentAktivKlubbId(), aktivFane);
+    rader = leaderboardRader.filter(r => spillerKart.has(r.spillerId));
   } catch (e) {
     console.error('[ratingLists] Kunne ikke hente liste:', e);
     listeContainer.innerHTML = '<div class="tom-tilstand-liten">Kunne ikke hente ratinglisten</div>';
     return;
   }
 
-  _ratingCache.set(cacheKey, { rader, hentetMs: Date.now() });
+  _ratingCache.sett(cacheKey, rader);
   tegnRader(listeContainer, rader);
 }
 
@@ -394,16 +386,27 @@ async function hentHistorikkForSpiller(spillerId) {
   // (playerAllround.allround) brukes fortsatt, men kun til tall-
   // visningen øverst i profilen -- hentes direkte i apneSpillerprofil().
 
-  // Øktene lagres uten spillerId på toppnivå (kun inni resultatPerSpiller),
-  // så vi henter hele samlingen og filtrerer i klienten -- samme mønster
-  // som brukes i Administrasjon-slettingen lenger ned i denne filen.
-  const oktSnap = await getDocs(query(collection(db, SAM.SESSIONS), orderBy('dato', 'desc'), limit(200)));
-  const okter = [];
-  for (const d of oktSnap.docs) {
-    const okt = d.data();
-    const rad = (okt.resultatPerSpiller ?? []).find(r => r.spillerId === spillerId);
-    if (rad) okter.push({ okt, rad });
-    if (okter.length >= 10) break;
+  // Spør klubbens EGEN økt-subcollection (klubber/{klubbId}/sessions,
+  // se firebase.js/domain-repository-firestoreRatingRepository.js) med
+  // where('spillerIder','array-contains', spillerId) -- Firestore
+  // returnerer da KUN øktene spilleren faktisk deltok i, i stedet for at
+  // vi må lese et bredt utvalg (tidligere: opptil 200 dokumenter, alle
+  // klubber) og lete etter treff i klienten. Ingen sammensatt indeks
+  // nødvendig siden det kun er ett array-contains-filter uten orderBy.
+  let okter = [];
+  try {
+    const oktSnap = await getDocs(query(oktSamling(hentAktivKlubbId()), where('spillerIder', 'array-contains', spillerId)));
+    okter = oktSnap.docs
+      .map(d => {
+        const okt = d.data();
+        const rad = (okt.resultatPerSpiller ?? []).find(r => r.spillerId === spillerId);
+        return rad ? { okt, rad } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => (b.okt.dato?.toMillis?.() ?? 0) - (a.okt.dato?.toMillis?.() ?? 0))
+      .slice(0, 10);
+  } catch (e) {
+    console.error('[ratingLists] Kunne ikke hente øktehistorikk:', e);
   }
 
   return { historikkPerKategori, okter };
@@ -575,12 +578,12 @@ document.addEventListener('sl-naviger', e => {
 // KLUBB-AVGRENSNING — delt hjelper, brukt av både visningen (tegnListe()
 // over) og administrasjons-slettingen under.
 //
-// Ratinger og økter lagres ikke med klubbId direkte i Firestore (se
-// ARKITEKTUR.md-datamodellen); avgrensningen til "aktiv klubb" skjer
-// derfor ved å slå opp hvilke spillerIder som tilhører klubben (samme
-// players-oppslag som resten av appen bruker), og kun slette/behandle
-// dokumenter som gjelder disse spillerIdene. Eksportert slik at
-// screens-archive.js kan filtrere arkivet på samme måte.
+// playerCategoryRatings/playerCompetitionProgress/playerAllround lagres
+// fortsatt ikke med klubbId direkte i Firestore (se KVOTE.md -- kun
+// leaderboards og sessions ble omstrukturert i denne omgangen);
+// avgrensningen til "aktiv klubb" for DISSE skjer derfor ved å slå opp
+// hvilke spillerIder som tilhører klubben (samme players-oppslag som
+// resten av appen bruker). Brukes av slettAllRatingForKlubb() under.
 // ════════════════════════════════════════════════════════
 export async function hentKlubbSpillerIder() {
   const kart = await hentSpillerKart(); // Map<spillerId, navn>, filtrert på aktiv klubb
@@ -623,6 +626,12 @@ window.lukkSlettBekreft = function () {
 };
 
 async function slettAllRatingForKlubb() {
+  // MERK: playerCategoryRatings/playerCompetitionProgress/playerAllround
+  // har fortsatt ikke klubbId-felt (kun leaderboards/sessions ble
+  // omstrukturert i denne omgangen, se KVOTE.md), så disse tre må
+  // fremdeles leses i sin helhet og filtreres på spillerIder. Sjeldent
+  // brukt admin-handling -- lavere prioritet enn de vanlige lese-stiene.
+  const klubbId = hentAktivKlubbId();
   const klubbSpillerIder = await hentKlubbSpillerIder();
   const bh = lagBatchHjelper(db);
 
@@ -632,20 +641,26 @@ async function slettAllRatingForKlubb() {
       if (klubbSpillerIder.has(d.data().spillerId)) await bh.slett(d.ref);
     }
   }
+  // Leaderboardene ER klubb-scopet (id: {klubbId}_{fane}) -- trivielt å
+  // slette direkte, ingen filtrering nødvendig.
+  for (const fane of ['allround', ...ALLE_KATEGORIER]) {
+    await bh.slett(doc(db, SAM.LEADERBOARDS, `${klubbId}_${fane}`));
+  }
   await bh.kommit();
+  nullstillRatingCache();
 }
 
 async function slettArkivForKlubb() {
-  const klubbSpillerIder = await hentKlubbSpillerIder();
+  // Sessions ligger nå i klubbens EGEN subcollection (klubber/{klubbId}/
+  // sessions, se firebase.js) -- trivielt å slette direkte, i motsetning
+  // til tidligere da hele den flate SAM.SESSIONS-samlingen (alle klubber)
+  // måtte leses og filtreres på klientsiden for å finne klubbens egne.
+  const klubbId = hentAktivKlubbId();
   const bh = lagBatchHjelper(db);
-
-  const snap = await getDocs(collection(db, SAM.SESSIONS));
-  for (const d of snap.docs) {
-    const okt = d.data();
-    const tilhorerKlubb = (okt.resultatPerSpiller ?? []).some(r => klubbSpillerIder.has(r.spillerId));
-    if (tilhorerKlubb) await bh.slett(d.ref);
-  }
+  const snap = await getDocs(oktSamling(klubbId));
+  for (const d of snap.docs) await bh.slett(d.ref);
   await bh.kommit();
+  nullstillArkivCache();
 }
 
 window.visAdminSeksjon = function () {
@@ -697,17 +712,25 @@ window.redigerRating = function (spillerId, kategori, gjeldendeVerdi) {
 };
 
 async function lagreRedigertRating(spillerId, kategori, nyVerdi) {
+  const klubbId = hentAktivKlubbId();
   try {
     await setDoc(
       doc(db, SAM.PLAYER_CATEGORY_RATINGS, `${spillerId}_${kategori}`),
       { spillerId, kategori, elo: nyVerdi },
       { merge: true },
     );
+    // Hold kategori-leaderboardet konsistent med den nye verdien -- denne
+    // skrivingen går IKKE via firestoreRatingRepository.js sin
+    // lagreOktResultat() (som ellers vedlikeholder leaderboardet), siden
+    // dette er en enkeltstående admin-redigering, ikke en fullført økt.
+    await oppdaterLeaderboardRad(klubbId, kategori, spillerId, nyVerdi);
     // Hold Allround konsistent med den nye verdien -- samme funksjon som
-    // kjøres etter en vanlig fullført økt.
-    await hentRatingService()?.oppdaterAllround(spillerId);
+    // kjøres etter en vanlig fullført økt (oppdaterer også
+    // 'allround'-leaderboardet).
+    await hentRatingService()?.oppdaterAllround(spillerId, klubbId);
     visMelding('Rating oppdatert');
-    nullstillRatingCache();
+    nullstillRatingCacheFor(kategori);
+    nullstillRatingCacheFor('allround');
     await tegnListe(true);
   } catch (e) {
     console.error('[ratingLists] Kunne ikke oppdatere rating:', e);
@@ -722,6 +745,7 @@ async function lagreRedigertRating(spillerId, kategori, nyVerdi) {
 // kun spillerens nåværende profil/rating fjernes.
 // ════════════════════════════════════════════════════════
 async function slettSpillerData(spillerId) {
+  const klubbId = hentAktivKlubbId();
   const bh = lagBatchHjelper(db);
 
   await bh.slett(doc(db, SAM.SPILLERE, spillerId));
@@ -734,6 +758,14 @@ async function slettSpillerData(spillerId) {
   await bh.slett(doc(db, SAM.PLAYER_ALLROUND, spillerId));
 
   await bh.kommit();
+
+  // Fjern spilleren fra leaderboardene også -- ellers ville hen (med en
+  // nå slettet rating) blitt stående synlig i ratinglisten helt til
+  // leaderboardet neste gang skrives av en annen grunn.
+  for (const fane of ['allround', ...ALLE_KATEGORIER]) {
+    await fjernFraLeaderboard(klubbId, fane, spillerId);
+  }
+  nullstillRatingCache();
 }
 
 window.slettSpillerBekreft = async function (spillerId) {

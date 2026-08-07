@@ -10,7 +10,7 @@ import { escHtml, naviger, visMelding } from './ui.js';
 import {
   hentOkt, plasserSpiller, angreSisteePlassering, erFerdigPlassert,
   beregnSluttbaner, nullstillOkt, hentRatingService,
-  lagreAktivOktTilSky, fullforAktivOktISky, hentSpillerKart,
+  lagreAktivOktTilSky, fullforAktivOktISky, hentSpillerKart, hentAktivKlubbId,
 } from './state.js';
 import { finnStartBane } from './domain-rating-courtAssignment.js';
 import { getErAdmin } from './admin.js';
@@ -162,7 +162,7 @@ async function utforFullforing() {
 
   try {
     const resultat = await ratingService.beregnOktResultat(okt.konkurranse, okt.startBaner, sluttbaner);
-    await ratingService.fullforOkt(resultat);
+    await ratingService.fullforOkt(resultat, hentAktivKlubbId());
     // Marker økten som fullført MED resultatet i skyen (i stedet for å
     // slette den) -- slik at andre som følger den ser resultatskjermen
     // også, se app.js sin haandterAktivOktEndring(). Fire-and-forget:

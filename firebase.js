@@ -38,7 +38,7 @@ export const SAM = {
   PLAYER_CATEGORY_RATINGS:     'playerCategoryRatings',   // id: {spillerId}_{kategori}
   PLAYER_COMPETITION_PROGRESS: 'playerCompetitionProgress', // id: {spillerId}_{konkurranse}
   PLAYER_ALLROUND:             'playerAllround',            // id: {spillerId}
-  SESSIONS:                    'sessions',                  // = arkivet
+  SESSIONS_LEGACY:             'sessions',                  // GAMMEL, flat arkivsamling -- kun brukt av engangs-migreringsscriptet (se migrer-engangs.html). Ny kode bruker oktSamling(klubbId)/oktDok() under.
   AKTIV_OKT:                   'activeSessions',            // id: {klubbId} -- pågående, delt økt
 
   // ── Ferdighetstester — egne samlinger, se domain-repository-firestoreTestRepository.js ──
@@ -49,7 +49,36 @@ export const SAM = {
   // ── Påmelding til treningsspor — egne samlinger, se domain-repository-firestorePameldingRepository.js ──
   PAMELDINGSRUNDER:            'pameldingsrunder',          // id: {klubbId} -- én aktiv runde per klubb
   SPOR_INTERESSE:              'sporInteresse',              // id: {klubbId}_{spillerId}
+
+  // ── Leaderboards — ferdig-sorterte, ferdig-avgrensede kopier av
+  // ratinglistene, én per klubb+fane (id: {klubbId}_{fane}, der fane er
+  // 'allround' eller en av RatingKategori). Vedlikeholdes av samme
+  // skriveoperasjoner som allerede oppdaterer playerCategoryRatings/
+  // playerAllround (se domain-repository-leaderboardRepository.js) --
+  // gjør at ratinglistene kan LESES med étt dokumentoppslag i stedet for
+  // å scanne hele playerCategoryRatings/playerAllround-samlingene (alle
+  // klubber) ved hvert besøk. Se KVOTE.md.
+  LEADERBOARDS:                 'leaderboards',
+
+  // ── Klubber (root for klubb-scopede subcollections) ──
+  KLUBBER:                      'klubber',                   // id: {klubbId}, subcollection 'sessions' under hver
 };
+
+/**
+ * Referanse til én klubbs økt-arkiv: klubber/{klubbId}/sessions/{oktId}.
+ * Erstatter den tidligere flate SAM.SESSIONS-samlingen (som ikke hadde
+ * noe klubbId-felt og derfor krevde at HELE samlingen -- alle klubber,
+ * all historikk -- ble lest og filtrert i klienten hver gang arkivet
+ * eller en spillerprofil ble åpnet). Med denne strukturen er hver
+ * spørring naturlig avgrenset til égen klubb helt uten filter. Se
+ * KVOTE.md for begrunnelse og migreringsnotat.
+ */
+export function oktSamling(klubbId) {
+  return collection(db, SAM.KLUBBER, klubbId, 'sessions');
+}
+export function oktDok(klubbId, oktId) {
+  return doc(db, SAM.KLUBBER, klubbId, 'sessions', oktId);
+}
 
 // ════════════════════════════════════════════════════════
 // FIREBASE INIT

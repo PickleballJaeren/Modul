@@ -99,7 +99,7 @@ repositoryet som parameter og bryr seg aldri om at det er Firestore under.
 
 ```
 players/{spillerId}
-  navn, opprettet
+  navn, klubbId, opprettet
 
 playerCategoryRatings/{spillerId}_{kategori}
   elo, historikk: [{oktId, dato, eloFor, eloEtter, sluttbane, plassering}]
@@ -107,10 +107,25 @@ playerCategoryRatings/{spillerId}_{kategori}
 playerCompetitionProgress/{spillerId}_{konkurranse}
   treningsAntall, status  (provisional | established)
 
-sessions/{oktId}
-  konkurranse, dato, deltakerIder, startBaner, sluttBaner, ratingEndringer
-  -- dette ER arkiv-oppføringen, ingen egen arkiv-samling nødvendig
+klubber/{klubbId}/sessions/{oktId}
+  konkurranse, dato, resultatPerSpiller, spillerIder
+  -- dette ER arkiv-oppføringen, ingen egen arkiv-samling nødvendig.
+  -- Klubb-scopet subcollection (ikke en flat, delt samling) -- se
+  -- KVOTE.md for hvorfor og migreringen fra det tidligere flate
+  -- sessions/{oktId}-formatet.
+
+leaderboards/{klubbId}_{fane}
+  klubbId, fane, rader: [{spillerId, verdi}] (sortert, maks 50)
+  -- ferdig-sortert lese-kopi av playerCategoryRatings/playerAllround,
+  -- vedlikeholdt av samme skriving som oppdaterer selve ratingen. Se
+  -- domain-repository-leaderboardRepository.js og KVOTE.md.
 ```
+
+**Merk:** `playerCategoryRatings`/`playerCompetitionProgress`/
+`playerAllround` har fortsatt ikke `klubbId` som eget felt på selve
+dokumentet (kun avledet via `players/{spillerId}.klubbId`) -- dette er
+en bevisst gjenværende begrensning, se "Ikke gjort i denne runden" i
+KVOTE.md.
 
 ## Byggerekkefølge
 
