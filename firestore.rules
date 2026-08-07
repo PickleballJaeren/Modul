@@ -88,16 +88,6 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // GAMMEL, flat arkivsamling -- IKKE lenger skrevet til av appen (se
-    // klubber/{klubbId}/sessions under). Leses/skrives kun av det
-    // engangs-migreringsscriptet som flytter gammel historikk over i
-    // klubb-subcollections (se migrer-engangs.html). Fjern denne
-    // match-blokken helt når migreringen er gjennomført og bekreftet.
-    match /sessions/{oktId} {
-      allow read: if true;
-      allow write: if true;
-    }
-
     // Aktiv, pågående økt -- én per klubb, delt i sanntid.
     match /activeSessions/{klubbId} {
       allow read: if true;

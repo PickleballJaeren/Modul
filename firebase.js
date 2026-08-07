@@ -38,7 +38,6 @@ export const SAM = {
   PLAYER_CATEGORY_RATINGS:     'playerCategoryRatings',   // id: {spillerId}_{kategori}
   PLAYER_COMPETITION_PROGRESS: 'playerCompetitionProgress', // id: {spillerId}_{konkurranse}
   PLAYER_ALLROUND:             'playerAllround',            // id: {spillerId}
-  SESSIONS_LEGACY:             'sessions',                  // GAMMEL, flat arkivsamling -- kun brukt av engangs-migreringsscriptet (se migrer-engangs.html). Ny kode bruker oktSamling(klubbId)/oktDok() under.
   AKTIV_OKT:                   'activeSessions',            // id: {klubbId} -- pågående, delt økt
 
   // ── Ferdighetstester — egne samlinger, se domain-repository-firestoreTestRepository.js ──
